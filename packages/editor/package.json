@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./styles.css": "./src/editor.css" },
+  "exports": { ".": "./src/index.ts", "./bridge": "./src/bridge.ts", "./styles.css": "./src/editor.css" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -32,4 +32,3 @@
     "typescript": "^5.9.2"
   }
 }
-
