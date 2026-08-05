@@ -53,6 +53,15 @@ export const commentSchema = z.object({ body: z.string().trim().min(1).max(5000)
 export const updateCommentSchema = z.object({ body: z.string().trim().min(1).max(5000).optional(), resolved: z.boolean().optional() });
 export const profileSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), locale: z.string().min(2).max(16).optional(), timezone: z.string().min(1).max(64).optional() });
 
+export const propertyTypeSchema = z.enum(["title", "text", "number", "select", "multi_select", "status", "date", "checkbox", "url", "email", "person", "files", "relation", "formula", "rollup"]);
+export const viewTypeSchema = z.enum(["table", "board", "calendar", "list", "gallery"]);
+export const createDatabaseSchema = z.object({ workspaceId: idSchema, pageId: idSchema.nullable().optional(), name: z.string().trim().min(1).max(200), description: z.string().max(2000).optional() });
+export const createPropertySchema = z.object({ name: z.string().trim().min(1).max(100), type: propertyTypeSchema, config: z.record(z.string(), z.unknown()).optional() });
+export const createViewSchema = z.object({ name: z.string().trim().min(1).max(100), type: viewTypeSchema, config: z.record(z.string(), z.unknown()).optional() });
+export const databaseRowSchema = z.object({ values: z.record(z.string(), z.unknown()), position: z.number().finite().optional() });
+export const databaseFormSchema = z.object({ title: z.string().trim().min(1).max(200), description: z.string().max(2000).optional(), config: z.record(z.string(), z.unknown()).optional() });
+export const databaseAutomationSchema = z.object({ name: z.string().trim().min(1).max(100), trigger: z.record(z.string(), z.unknown()), actions: z.array(z.record(z.string(), z.unknown())).min(1) });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreatePageInput = z.infer<typeof createPageSchema>;
@@ -79,3 +88,8 @@ export const API_VERSION = "1";
 export type PermissionLevel = "view" | "comment" | "edit" | "full_access";
 export type Comment = { id: string; pageId: string; parentId: string | null; blockId: string | null; body: string; authorId: string; authorName: string; resolvedAt: string | null; createdAt: string };
 export type Notification = { id: string; kind: "invitation" | "mention" | "comment" | "reply" | "permission" | "system"; pageId: string | null; workspaceId: string | null; payload: Record<string, unknown>; readAt: string | null; createdAt: string };
+export type PropertyType = z.infer<typeof propertyTypeSchema>;
+export type DatabaseProperty = { id: string; databaseId: string; name: string; type: PropertyType; config: Record<string, unknown>; position: number };
+export type DatabaseRow = { id: string; databaseId: string; pageId: string | null; values: Record<string, unknown>; position: number; createdAt: string; updatedAt: string };
+export type DatabaseView = { id: string; databaseId: string; name: string; type: z.infer<typeof viewTypeSchema>; config: { filters?: Array<Record<string, unknown>>; sorts?: Array<Record<string, unknown>>; groupBy?: string; dateProperty?: string; [key: string]: unknown }; position: number };
+export type Database = { id: string; workspaceId: string; pageId: string | null; name: string; description: string; properties: DatabaseProperty[]; views: DatabaseView[]; rows: DatabaseRow[] };

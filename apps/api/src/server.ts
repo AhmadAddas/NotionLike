@@ -21,6 +21,7 @@ import { config } from "./config.js";
 import { pageAccess, sql, workspaceRole } from "./db.js";
 import { registerCollaboration } from "./collaboration.js";
 import { registerPlatformRoutes } from "./platform-routes.js";
+import { registerDatabaseRoutes } from "./database-routes.js";
 
 const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === "true", bodyLimit: 2 * 1024 * 1024 });
 await app.register(cookie);
@@ -54,6 +55,7 @@ app.get("/ready", async (_request, reply) => {
 app.get("/api/v1/meta", async () => ({ apiVersion: "1", product: "NotionLike", maxUploadBytes: 25_000_000, registration: config.allowRegistration, sso: Boolean(config.oidc) }));
 await registerCollaboration(app);
 await registerPlatformRoutes(app);
+await registerDatabaseRoutes(app);
 
 app.post("/api/v1/auth/register", { config: { rateLimit: { max: 10, timeWindow: "1 hour" } } }, async (request, reply) => {
   if (!config.allowRegistration) return reply.code(403).send({ error: "Registration is disabled" });

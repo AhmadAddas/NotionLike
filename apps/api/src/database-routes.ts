@@ -1,0 +1,67 @@
+import { randomBytes } from "node:crypto";
+import type { FastifyInstance } from "fastify";
+import { createDatabaseSchema, createPropertySchema, createViewSchema, databaseAutomationSchema, databaseFormSchema, databaseRowSchema } from "@notionlike/contracts";
+import { authenticate } from "./auth.js";
+import { sql, workspaceRole } from "./db.js";
+
+const parse = <T>(schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }, value: unknown, reply: any) => {
+  const result = schema.safeParse(value); if (!result.success) { reply.code(400).send({ error: "Invalid request" }); return null; } return result.data as T;
+};
+const databaseAccess = async (userId: string, databaseId: string, write = false) => {
+  const rows = await sql<{ role: string }[]>`SELECT wm.role FROM databases d JOIN workspace_members wm ON wm.workspace_id=d.workspace_id WHERE d.id=${databaseId} AND wm.user_id=${userId}`;
+  return Boolean(rows[0] && (!write || ["owner", "admin", "member"].includes(rows[0].role)));
+};
+const loadDatabase = async (id: string) => {
+  const [database] = await sql`SELECT * FROM databases WHERE id=${id}`;
+  if (!database) return null;
+  const [properties, views, rows] = await Promise.all([
+    sql`SELECT * FROM database_properties WHERE database_id=${id} ORDER BY position`,
+    sql`SELECT * FROM database_views WHERE database_id=${id} ORDER BY position`,
+    sql`SELECT * FROM database_rows WHERE database_id=${id} ORDER BY position, created_at`,
+  ]);
+  return { ...database, properties, views, rows };
+};
+
+async function runAutomations(databaseId: string, rowId: string, before: Record<string, unknown>, after: Record<string, unknown>) {
+  const rules = await sql<any[]>`SELECT * FROM database_automations WHERE database_id=${databaseId} AND enabled`;
+  for (const rule of rules) {
+    const trigger = rule.trigger as any;
+    if (trigger.type !== "property_changed" || before[trigger.propertyId] === after[trigger.propertyId]) continue;
+    if (trigger.equals !== undefined && after[trigger.propertyId] !== trigger.equals) continue;
+    for (const action of rule.actions as any[]) {
+      if (action.type === "set_property") await sql`UPDATE database_rows SET values=values || ${sql.json({ [action.propertyId]: action.value })}, updated_at=now() WHERE id=${rowId}`;
+      if (action.type === "notify" && action.userId) await sql`INSERT INTO notifications (user_id, workspace_id, kind, payload) SELECT ${action.userId}, workspace_id, 'system', ${sql.json({ title: action.message ?? rule.name, databaseId, rowId })} FROM databases WHERE id=${databaseId}`;
+    }
+  }
+}
+
+export async function registerDatabaseRoutes(app: FastifyInstance) {
+  app.get("/api/v1/workspaces/:workspaceId/databases", { preHandler: authenticate }, async (request, reply) => {
+    const { workspaceId } = request.params as any; if (!await workspaceRole(request.user.id, workspaceId)) return reply.code(403).send({ error: "Forbidden" });
+    return { databases: await sql`SELECT id, workspace_id, page_id, name, description, updated_at FROM databases WHERE workspace_id=${workspaceId} ORDER BY updated_at DESC` };
+  });
+  app.post("/api/v1/databases", { preHandler: authenticate }, async (request, reply) => {
+    const body = parse(createDatabaseSchema, request.body, reply); if (!body) return;
+    const role = await workspaceRole(request.user.id, body.workspaceId); if (!role || !["owner", "admin", "member"].includes(role)) return reply.code(403).send({ error: "Forbidden" });
+    const [database] = await sql.begin(async tx => {
+      const rows = await tx`INSERT INTO databases (workspace_id,page_id,name,description,created_by) VALUES (${body.workspaceId},${body.pageId ?? null},${body.name},${body.description ?? ""},${request.user.id}) RETURNING *`;
+      await tx`INSERT INTO database_properties (database_id,name,type,position) VALUES (${rows[0]!.id},'Name','title',0),(${rows[0]!.id},'Status','status',1)`;
+      await tx`INSERT INTO database_views (database_id,name,type,position) VALUES (${rows[0]!.id},'Table','table',0)`;
+      return rows;
+    });
+    return reply.code(201).send({ database: await loadDatabase(database!.id) });
+  });
+  app.get("/api/v1/databases/:id", { preHandler: authenticate }, async (request, reply) => { const { id } = request.params as any; if (!await databaseAccess(request.user.id,id)) return reply.code(403).send({error:"Forbidden"}); return { database: await loadDatabase(id) }; });
+  app.post("/api/v1/databases/:id/properties", { preHandler: authenticate }, async (request, reply) => { const { id }=request.params as any; if(!await databaseAccess(request.user.id,id,true)) return reply.code(403).send({error:"Forbidden"}); const b=parse(createPropertySchema,request.body,reply); if(!b)return; const rows=await sql`INSERT INTO database_properties(database_id,name,type,config,position) VALUES(${id},${b.name},${b.type},${sql.json((b.config??{}) as any)},COALESCE((SELECT max(position)+1 FROM database_properties WHERE database_id=${id}),0)) RETURNING *`; return reply.code(201).send({property:rows[0]}); });
+  app.patch("/api/v1/database-properties/:id", { preHandler: authenticate }, async (request, reply) => { const {id}=request.params as any; const [p]=await sql<{databaseId:string}[]>`SELECT database_id FROM database_properties WHERE id=${id}`; if(!p||!await databaseAccess(request.user.id,p.databaseId,true))return reply.code(403).send({error:"Forbidden"}); const body=request.body as any; const rows=await sql`UPDATE database_properties SET name=COALESCE(${body.name??null},name),config=COALESCE(${body.config?sql.json(body.config):null},config) WHERE id=${id} RETURNING *`; return {property:rows[0]}; });
+  app.delete("/api/v1/database-properties/:id", { preHandler: authenticate }, async (request, reply) => { const {id}=request.params as any; const [p]=await sql<{databaseId:string;type:string}[]>`SELECT database_id,type FROM database_properties WHERE id=${id}`; if(!p||p.type==='title'||!await databaseAccess(request.user.id,p.databaseId,true))return reply.code(403).send({error:"Forbidden"}); await sql`DELETE FROM database_properties WHERE id=${id}`; return reply.code(204).send(); });
+  app.post("/api/v1/databases/:id/views", { preHandler: authenticate }, async (request, reply) => { const {id}=request.params as any;if(!await databaseAccess(request.user.id,id,true))return reply.code(403).send({error:"Forbidden"});const b=parse(createViewSchema,request.body,reply);if(!b)return;const rows=await sql`INSERT INTO database_views(database_id,name,type,config,position) VALUES(${id},${b.name},${b.type},${sql.json((b.config??{filters:[],sorts:[]}) as any)},COALESCE((SELECT max(position)+1 FROM database_views WHERE database_id=${id}),0)) RETURNING *`;return reply.code(201).send({view:rows[0]}); });
+  app.patch("/api/v1/database-views/:id", { preHandler: authenticate }, async (request,reply)=>{const {id}=request.params as any;const [v]=await sql<{databaseId:string}[]>`SELECT database_id FROM database_views WHERE id=${id}`;if(!v||!await databaseAccess(request.user.id,v.databaseId,true))return reply.code(403).send({error:"Forbidden"});const b=request.body as any;const rows=await sql`UPDATE database_views SET name=COALESCE(${b.name??null},name),type=COALESCE(${b.type??null},type),config=COALESCE(${b.config?sql.json(b.config):null},config) WHERE id=${id} RETURNING *`;return {view:rows[0]};});
+  app.post("/api/v1/databases/:id/rows", { preHandler: authenticate }, async (request,reply)=>{const {id}=request.params as any;if(!await databaseAccess(request.user.id,id,true))return reply.code(403).send({error:"Forbidden"});const b=parse(databaseRowSchema,request.body,reply);if(!b)return;const rows=await sql`INSERT INTO database_rows(database_id,values,position,created_by) VALUES(${id},${sql.json(b.values as any)},${b.position??Date.now()},${request.user.id}) RETURNING *`;return reply.code(201).send({row:rows[0]});});
+  app.patch("/api/v1/database-rows/:id", { preHandler: authenticate }, async (request,reply)=>{const {id}=request.params as any;const [row]=await sql<any[]>`SELECT * FROM database_rows WHERE id=${id}`;if(!row||!await databaseAccess(request.user.id,row.databaseId,true))return reply.code(403).send({error:"Forbidden"});const b=parse(databaseRowSchema,request.body,reply);if(!b)return;const merged={...row.values,...b.values};const rows=await sql`UPDATE database_rows SET values=${sql.json(merged)},position=COALESCE(${b.position??null},position),updated_at=now() WHERE id=${id} RETURNING *`;await runAutomations(row.databaseId,id,row.values,merged);return {row:rows[0]};});
+  app.delete("/api/v1/database-rows/:id", { preHandler: authenticate }, async (request,reply)=>{const {id}=request.params as any;const [row]=await sql<{databaseId:string}[]>`SELECT database_id FROM database_rows WHERE id=${id}`;if(!row||!await databaseAccess(request.user.id,row.databaseId,true))return reply.code(403).send({error:"Forbidden"});await sql`DELETE FROM database_rows WHERE id=${id}`;return reply.code(204).send();});
+  app.post("/api/v1/databases/:id/forms", { preHandler: authenticate }, async(request,reply)=>{const{id}=request.params as any;if(!await databaseAccess(request.user.id,id,true))return reply.code(403).send({error:"Forbidden"});const b=parse(databaseFormSchema,request.body,reply);if(!b)return;const token=randomBytes(24).toString('base64url');const rows=await sql`INSERT INTO database_forms(database_id,title,description,token,config) VALUES(${id},${b.title},${b.description??''},${token},${sql.json((b.config??{}) as any)}) RETURNING *`;return reply.code(201).send({form:rows[0]});});
+  app.get("/api/v1/forms/:token",async(request,reply)=>{const{token}=request.params as any;const rows=await sql`SELECT f.id,f.title,f.description,f.config,d.name,database_id,(SELECT json_agg(p ORDER BY position) FROM database_properties p WHERE p.database_id=d.id) properties FROM database_forms f JOIN databases d ON d.id=f.database_id WHERE token=${token} AND enabled`;return rows[0]?{form:rows[0]}:reply.code(404).send({error:"Form not found"});});
+  app.post("/api/v1/forms/:token/responses",async(request,reply)=>{const{token}=request.params as any;const [form]=await sql<{databaseId:string}[]>`SELECT database_id FROM database_forms WHERE token=${token} AND enabled`;if(!form)return reply.code(404).send({error:"Form not found"});const values=(request.body as any)?.values;if(!values||typeof values!=="object")return reply.code(400).send({error:"Invalid response"});await sql`INSERT INTO database_rows(database_id,values,position,created_by) SELECT ${form.databaseId},${sql.json(values)},${Date.now()},created_by FROM databases WHERE id=${form.databaseId}`;return reply.code(201).send({accepted:true});});
+  app.post("/api/v1/databases/:id/automations", {preHandler:authenticate},async(request,reply)=>{const{id}=request.params as any;if(!await databaseAccess(request.user.id,id,true))return reply.code(403).send({error:"Forbidden"});const b=parse(databaseAutomationSchema,request.body,reply);if(!b)return;const rows=await sql`INSERT INTO database_automations(database_id,name,trigger,actions,created_by) VALUES(${id},${b.name},${sql.json(b.trigger as any)},${sql.json(b.actions as any)},${request.user.id}) RETURNING *`;return reply.code(201).send({automation:rows[0]});});
+}
