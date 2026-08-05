@@ -1,0 +1,17 @@
+.block-editor { position: relative; }
+.editor-toolbar { position: sticky; top: 52px; z-index: 5; display: flex; gap: 4px; width: max-content; padding: 5px; margin: 0 0 24px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: 0 6px 18px #00000012; }
+.editor-toolbar button { border: 0; border-radius: 6px; padding: 6px 9px; color: var(--muted); background: transparent; cursor: pointer; }
+.editor-toolbar button:hover, .editor-toolbar button[aria-pressed="true"] { color: var(--text); background: var(--hover); }
+.tiptap { min-height: 55vh; outline: none; color: var(--text); font-size: 16px; line-height: 1.65; }
+.tiptap > * + * { margin-top: .65em; }
+.tiptap h1 { font-size: 2rem; }.tiptap h2 { font-size: 1.5rem; }.tiptap h3 { font-size: 1.2rem; }
+.tiptap ul, .tiptap ol { padding-left: 1.5rem; }
+.tiptap ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+.tiptap ul[data-type="taskList"] li { display: flex; gap: .6rem; align-items: flex-start; }
+.tiptap blockquote { border-left: 3px solid var(--text); padding-left: 1rem; color: var(--muted); }
+.tiptap pre { overflow-x: auto; padding: 1rem; border-radius: 8px; color: #e8e8ea; background: #202124; }
+.tiptap code:not(pre code) { padding: 2px 5px; border-radius: 4px; background: var(--hover); }
+.tiptap img { max-width: 100%; border-radius: 8px; }
+.tiptap p.is-editor-empty:first-child::before { float: left; height: 0; color: var(--subtle); pointer-events: none; content: attr(data-placeholder); }
+.editor-loading { padding: 32px 0; color: var(--muted); }
+
