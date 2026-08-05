@@ -26,7 +26,8 @@ export async function createSession(userId: string, reply: FastifyReply) {
 }
 
 export async function destroySession(request: FastifyRequest, reply: FastifyReply) {
-  const token = request.cookies[COOKIE] ?? request.headers.authorization?.replace(/^Bearer /, "");
+  const queryToken = (request.query as { token?: string } | undefined)?.token;
+  const token = request.cookies[COOKIE] ?? request.headers.authorization?.replace(/^Bearer /, "") ?? queryToken;
   if (token) await sql`DELETE FROM sessions WHERE token_hash = ${digest(token)}`;
   reply.clearCookie(COOKIE, { path: "/" });
 }
@@ -45,4 +46,3 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
 declare module "fastify" {
   interface FastifyRequest { user: SessionUser }
 }
-

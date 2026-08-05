@@ -9,6 +9,8 @@ export default function LoginPage() {
     event.preventDefault(); setBusy(true); setError(""); const data = new FormData(event.currentTarget);
     try {
       await api(register ? "/auth/register" : "/auth/login", { method: "POST", body: JSON.stringify({ name: data.get("name"), email: data.get("email"), password: data.get("password") }) });
+      const pending = localStorage.getItem("pendingInvitation");
+      if (pending) { await api("/invitations/accept", { method: "POST", body: JSON.stringify({ token: pending }) }); localStorage.removeItem("pendingInvitation"); }
       router.push("/workspace");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to sign in"); } finally { setBusy(false); }
   };
@@ -24,6 +26,7 @@ export default function LoginPage() {
       <button className="primary-button" disabled={busy}>{busy ? "Please wait…" : register ? "Create account" : "Sign in"}</button>
     </form>
     <button className="text-button" onClick={() => { setRegister(!register); setError(""); }}>{register ? "Already have an account? Sign in" : "New here? Create an account"}</button>
+    {!register && <><a className="auth-link" href="/forgot-password">Forgot password?</a><a className="auth-link" href="/api/v1/auth/oidc">Sign in with SSO</a></>}
   </section></main>;
 }
 

@@ -38,9 +38,13 @@ To roll back application images, restore the previous source tag or `VERSION`. I
 
 `scripts/restore.sh BACKUP_DIRECTORY` requires an explicit `RESTORE` confirmation, stops application writers, recreates the database and object store, and restarts the clients. Test restores regularly on a separate server.
 
-## Storage and email
+## Storage, email, and SSO
 
-The bundled MinIO ports are suitable for a single server. For external S3, replace the S3 environment values and omit the MinIO services through a deployment override. SMTP-backed invitations and password recovery are reserved for the next release; current owners create accounts through enabled registration and then disable it.
+The bundled MinIO ports are suitable for a single server. For external S3, replace the S3 environment values and omit the MinIO services through a deployment override.
+
+Set `SMTP_URL` and `MAIL_FROM` to deliver invitations and password resets. Without SMTP, workspace administrators receive a copyable invitation URL; password-reset requests remain deliberately indistinguishable but cannot deliver mail.
+
+Generic OpenID Connect is enabled when `OIDC_ISSUER` and `OIDC_CLIENT_ID` are set. Configure the provider callback as `APP_URL/api/v1/auth/oidc/callback`; set `OIDC_CLIENT_SECRET` for confidential clients. OIDC uses discovery, PKCE, nonce and state validation, and links verified email identities to existing accounts.
 
 ## Security checklist
 
@@ -50,4 +54,3 @@ The bundled MinIO ports are suitable for a single server. For external S3, repla
 - Use unique database, storage, and session secrets.
 - Put backups on encrypted off-server storage and test recovery.
 - Review container and dependency updates before each release.
-

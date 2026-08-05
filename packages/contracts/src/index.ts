@@ -37,13 +37,29 @@ export const documentUpdateSchema = z.object({
   sequence: z.number().int().nonnegative(),
 });
 
+export const invitationSchema = z.object({
+  email: emailSchema,
+  role: z.enum(["admin", "member", "guest"]).default("member"),
+});
+export const acceptInvitationSchema = z.object({ token: z.string().min(20).max(200) });
+export const forgotPasswordSchema = z.object({ email: emailSchema });
+export const resetPasswordSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
+export const pagePermissionSchema = z.object({
+  userId: idSchema.optional(),
+  workspaceRole: z.enum(["admin", "member", "guest"]).optional(),
+  permission: z.enum(["view", "comment", "edit", "full_access"]),
+}).refine((value) => Boolean(value.userId) !== Boolean(value.workspaceRole), "Choose exactly one permission subject");
+export const commentSchema = z.object({ body: z.string().trim().min(1).max(5000), blockId: z.string().max(100).optional(), parentId: idSchema.optional() });
+export const updateCommentSchema = z.object({ body: z.string().trim().min(1).max(5000).optional(), resolved: z.boolean().optional() });
+export const profileSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), locale: z.string().min(2).max(16).optional(), timezone: z.string().min(1).max(64).optional() });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreatePageInput = z.infer<typeof createPageSchema>;
 export type UpdatePageInput = z.infer<typeof updatePageSchema>;
 
 export type User = { id: string; name: string; email: string };
-export type Workspace = { id: string; name: string; role: "owner" | "member" | "guest" };
+export type Workspace = { id: string; name: string; role: "owner" | "admin" | "member" | "guest" };
 export type Page = {
   id: string;
   workspaceId: string;
@@ -60,3 +76,6 @@ export type Page = {
 
 export const API_VERSION = "1";
 
+export type PermissionLevel = "view" | "comment" | "edit" | "full_access";
+export type Comment = { id: string; pageId: string; parentId: string | null; blockId: string | null; body: string; authorId: string; authorName: string; resolvedAt: string | null; createdAt: string };
+export type Notification = { id: string; kind: "invitation" | "mention" | "comment" | "reply" | "permission" | "system"; pageId: string | null; workspaceId: string | null; payload: Record<string, unknown>; readAt: string | null; createdAt: string };

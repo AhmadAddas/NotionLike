@@ -1,0 +1,32 @@
+"use client";
+import { FormEvent, useEffect, useState } from "react";
+import { Bell, Check, MessageSquare, Send, Shield, UserPlus, X } from "lucide-react";
+import type { Comment, Notification, Page, PermissionLevel, Workspace } from "@notionlike/contracts";
+import { api } from "../../lib/api";
+
+export function CommentsPanel({ page, onClose }: { page: Page; onClose: () => void }) {
+  const [comments, setComments] = useState<Comment[]>([]); const [body, setBody] = useState(""); const [error, setError] = useState("");
+  const load = () => void api<{ comments: Comment[] }>(`/pages/${page.id}/comments`).then((result) => setComments(result.comments)).catch((reason) => setError(String(reason)));
+  useEffect(load, [page.id]);
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!body.trim()) return; try { await api(`/pages/${page.id}/comments`, { method: "POST", body: JSON.stringify({ body }) }); setBody(""); load(); } catch (reason) { setError(String(reason)); } };
+  return <aside className="right-panel"><header><MessageSquare size={18} /><strong>Comments</strong><button onClick={onClose}><X size={18} /></button></header><div className="panel-scroll">{comments.map((comment) => <article key={comment.id} className={`comment ${comment.resolvedAt ? "resolved" : ""}`}><div><strong>{comment.authorName}</strong><time>{new Date(comment.createdAt).toLocaleString()}</time></div><p>{comment.body}</p>{!comment.resolvedAt && <button onClick={() => void api(`/comments/${comment.id}`, { method: "PATCH", body: JSON.stringify({ resolved: true }) }).then(load)}><Check size={13} /> Resolve</button>}</article>)}{!comments.length && <div className="panel-empty">Start a discussion about this page.</div>}{error && <p className="panel-error">{error}</p>}</div><form className="comment-form" onSubmit={submit}><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Add a comment…" maxLength={5000} /><button title="Send"><Send size={17} /></button></form></aside>;
+}
+
+type Member = { id: string; name: string; email: string; role: string };
+type Grant = { userId: string | null; workspaceRole: string | null; permission: PermissionLevel; name?: string; email?: string };
+export function AccessPanel({ workspace, page, onClose }: { workspace: Workspace; page: Page; onClose: () => void }) {
+  const [members, setMembers] = useState<Member[]>([]); const [permissions, setPermissions] = useState<Grant[]>([]); const [email, setEmail] = useState(""); const [role, setRole] = useState("member"); const [message, setMessage] = useState("");
+  const load = () => { void api<{ members: Member[] }>(`/workspaces/${workspace.id}/members`).then((result) => setMembers(result.members)); void api<{ permissions: Grant[] }>(`/pages/${page.id}/permissions`).then((result) => setPermissions(result.permissions)).catch(() => setPermissions([])); };
+  useEffect(load, [page.id, workspace.id]);
+  const invite = async (event: FormEvent) => { event.preventDefault(); try { const result = await api<{ delivered: boolean; inviteUrl?: string }>(`/workspaces/${workspace.id}/invitations`, { method: "POST", body: JSON.stringify({ email, role }) }); setMessage(result.delivered ? "Invitation email sent." : `SMTP is disabled. Copy this link: ${result.inviteUrl}`); setEmail(""); } catch (reason) { setMessage(String(reason)); } };
+  const grant = async (userId: string, permission: PermissionLevel) => { await api(`/pages/${page.id}/permissions`, { method: "PUT", body: JSON.stringify({ userId, permission }) }); load(); };
+  return <aside className="right-panel wide"><header><Shield size={18} /><strong>Sharing and access</strong><button onClick={onClose}><X size={18} /></button></header><div className="panel-scroll"><section className="panel-section"><h3>Invite to {workspace.name}</h3><form className="invite-form" onSubmit={invite}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" required /><select value={role} onChange={(event) => setRole(event.target.value)}><option value="member">Member</option><option value="guest">Guest</option><option value="admin">Admin</option></select><button><UserPlus size={15} /> Invite</button></form>{message && <p className="panel-note">{message}</p>}</section><section className="panel-section"><h3>Page permissions</h3>{members.map((member) => { const explicit = permissions.find((grant) => grant.userId === member.id); return <div className="member-row" key={member.id}><span className="avatar subtle">{member.name[0]}</span><div><strong>{member.name}</strong><small>{member.email} · {member.role}</small></div><select value={explicit?.permission ?? "inherited"} onChange={(event) => event.target.value !== "inherited" && void grant(member.id, event.target.value as PermissionLevel)}><option value="inherited">Inherited</option><option value="view">Can view</option><option value="comment">Can comment</option><option value="edit">Can edit</option><option value="full_access">Full access</option></select></div>; })}</section></div></aside>;
+}
+
+export function NotificationButton() {
+  const [open, setOpen] = useState(false); const [notifications, setNotifications] = useState<Notification[]>([]);
+  const load = () => void api<{ notifications: Notification[] }>("/notifications").then((result) => setNotifications(result.notifications));
+  useEffect(() => { load(); const timer = setInterval(load, 30_000); return () => clearInterval(timer); }, []);
+  const unread = notifications.filter((item) => !item.readAt).length;
+  return <div className="notification-control"><button className="icon-button" title="Notifications" onClick={() => { setOpen(!open); if (!open && unread) void api("/notifications/read", { method: "POST", body: JSON.stringify({}) }).then(load); }}><Bell size={18} />{unread > 0 && <span className="notification-badge">{unread}</span>}</button>{open && <section className="notification-popover"><header><strong>Notifications</strong></header>{notifications.slice(0, 12).map((item) => <div key={item.id} className={!item.readAt ? "unread" : ""}><span>{item.kind === "comment" ? "💬" : item.kind === "invitation" ? "✉️" : "🔔"}</span><p><strong>{item.kind.replace("_", " ")}</strong><small>{new Date(item.createdAt).toLocaleString()}</small></p></div>)}{!notifications.length && <div className="panel-empty">You’re all caught up.</div>}</section>}</div>;
+}

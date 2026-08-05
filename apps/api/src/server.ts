@@ -4,6 +4,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import websocket from "@fastify/websocket";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as Y from "yjs";
@@ -18,12 +19,15 @@ import {
 import { authenticate, createSession, destroySession, passwordHash, passwordMatches } from "./auth.js";
 import { config } from "./config.js";
 import { pageAccess, sql, workspaceRole } from "./db.js";
+import { registerCollaboration } from "./collaboration.js";
+import { registerPlatformRoutes } from "./platform-routes.js";
 
 const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === "true", bodyLimit: 2 * 1024 * 1024 });
 await app.register(cookie);
 await app.register(cors, { origin: config.appUrl, credentials: true });
 await app.register(helmet, { contentSecurityPolicy: false });
 await app.register(rateLimit, { max: 200, timeWindow: "1 minute" });
+await app.register(websocket);
 
 const s3 = new S3Client({
   endpoint: config.s3.endpoint,
@@ -47,7 +51,9 @@ app.get("/health", async () => ({ status: "ok" }));
 app.get("/ready", async (_request, reply) => {
   try { await sql`SELECT 1`; return { status: "ready" }; } catch { return reply.code(503).send({ status: "unavailable" }); }
 });
-app.get("/api/v1/meta", async () => ({ apiVersion: "1", product: "NotionLike", maxUploadBytes: 25_000_000, registration: config.allowRegistration }));
+app.get("/api/v1/meta", async () => ({ apiVersion: "1", product: "NotionLike", maxUploadBytes: 25_000_000, registration: config.allowRegistration, sso: Boolean(config.oidc) }));
+await registerCollaboration(app);
+await registerPlatformRoutes(app);
 
 app.post("/api/v1/auth/register", { config: { rateLimit: { max: 10, timeWindow: "1 hour" } } }, async (request, reply) => {
   if (!config.allowRegistration) return reply.code(403).send({ error: "Registration is disabled" });
@@ -70,9 +76,9 @@ app.post("/api/v1/auth/register", { config: { rateLimit: { max: 10, timeWindow: 
 
 app.post("/api/v1/auth/login", { config: { rateLimit: { max: 15, timeWindow: "15 minutes" } } }, async (request, reply) => {
   const body = parse(loginSchema, request.body, reply); if (!body) return;
-  const users = await sql<{ id: string; name: string; email: string; passwordHash: string }[]>`SELECT id, name, email, password_hash FROM users WHERE email = ${body.email}`;
+  const users = await sql<{ id: string; name: string; email: string; passwordHash: string | null }[]>`SELECT id, name, email, password_hash FROM users WHERE email = ${body.email}`;
   const user = users[0];
-  if (!user || !(await passwordMatches(user.passwordHash, body.password))) return reply.code(401).send({ error: "Invalid email or password" });
+  if (!user?.passwordHash || !(await passwordMatches(user.passwordHash, body.password))) return reply.code(401).send({ error: "Invalid email or password" });
   const token = await createSession(user.id, reply);
   return { user: { id: user.id, name: user.name, email: user.email }, token };
 });
@@ -200,4 +206,3 @@ app.setErrorHandler((error, _request, reply) => { app.log.error(error); reply.co
 const close = async () => { await app.close(); await sql.end(); process.exit(0); };
 process.on("SIGTERM", close); process.on("SIGINT", close);
 await app.listen({ port: config.port, host: "0.0.0.0" });
-

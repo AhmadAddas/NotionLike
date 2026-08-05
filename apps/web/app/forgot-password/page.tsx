@@ -1,0 +1,4 @@
+"use client";
+import { FormEvent, useState } from "react";
+import { api } from "../../lib/api";
+export default function ForgotPasswordPage() { const [sent, setSent] = useState(false); const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const email = new FormData(event.currentTarget).get("email"); await api("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }); setSent(true); }; return <main className="auth-page"><section className="auth-card"><div className="brand"><span className="brand-mark">N</span> NotionLike</div><h1>Reset your password</h1>{sent ? <p>If an account exists, a recovery link has been sent.</p> : <form onSubmit={submit}><label>Email<input name="email" type="email" required /></label><button className="primary-button">Send recovery link</button></form>}</section></main>; }

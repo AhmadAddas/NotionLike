@@ -19,6 +19,8 @@ export type BlockEditorProps = {
   readOnly?: boolean;
   initialUpdate?: string;
   onSyncState?: (state: SyncState) => void;
+  user?: { id: string; name: string };
+  onPresence?: (users: Array<{ id: string; name: string }>) => void;
 };
 
 const fromBase64 = (value: string) => Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
@@ -28,7 +30,7 @@ const toBase64 = (value: Uint8Array) => {
   return btoa(binary);
 };
 
-export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initialUpdate, onSyncState }: BlockEditorProps) {
+export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initialUpdate, onSyncState, user, onPresence }: BlockEditorProps) {
   const document = useMemo(() => new Y.Doc(), [pageId]);
   const sequence = useRef(Number(globalThis.localStorage?.getItem(`nl-sequence-${pageId}`) ?? "0"));
   const clientId = useRef(globalThis.localStorage?.getItem("nl-client-id") ?? crypto.randomUUID());
@@ -91,6 +93,30 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
     document.on("update", updateHandler); window.addEventListener("online", onlineHandler);
     return () => { clearTimeout(timer); document.off("update", updateHandler); window.removeEventListener("online", onlineHandler); void flush(); };
   }, [apiBaseUrl, document, headers, onSyncState, pageId, readOnly]);
+
+  useEffect(() => {
+    if (readOnly || typeof WebSocket === "undefined") return;
+    const peers = new Map<string, { id: string; name: string }>();
+    const base = apiBaseUrl.replace(/^http/, "ws");
+    const url = `${base}/pages/${pageId}/live${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+    const socket = new WebSocket(url);
+    const updateHandler = (update: Uint8Array, origin: unknown) => {
+      if (origin !== "remote" && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "update", update: toBase64(update) }));
+    };
+    socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "presence", presence: { editing: true, name: user?.name } })));
+    socket.addEventListener("message", (event) => {
+      try {
+        const message = JSON.parse(String(event.data)) as { type: string; update?: string; action?: string; user?: { id: string; name: string } };
+        if (message.type === "update" && message.update) Y.applyUpdate(document, fromBase64(message.update), "remote");
+        if (message.type === "presence" && message.user) {
+          if (message.action === "leave") peers.delete(message.user.id); else peers.set(message.user.id, message.user);
+          onPresence?.([...peers.values()]);
+        }
+      } catch { /* Ignore malformed peer messages. */ }
+    });
+    document.on("update", updateHandler);
+    return () => { document.off("update", updateHandler); socket.close(); onPresence?.([]); };
+  }, [apiBaseUrl, document, onPresence, pageId, readOnly, token, user?.name]);
 
   const editor = useEditor({
     extensions: [

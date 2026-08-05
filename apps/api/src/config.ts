@@ -18,4 +18,11 @@ export const config = {
     accessKey: required("S3_ACCESS_KEY", "notionlike"),
     secretKey: required("S3_SECRET_KEY", "change-me-too"),
   },
+  smtpUrl: process.env.SMTP_URL,
+  mailFrom: process.env.MAIL_FROM ?? "NotionLike <noreply@localhost>",
+  oidc: process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID ? {
+    issuer: process.env.OIDC_ISSUER.replace(/\/$/, ""),
+    clientId: process.env.OIDC_CLIENT_ID,
+    clientSecret: process.env.OIDC_CLIENT_SECRET,
+  } : null,
 };
