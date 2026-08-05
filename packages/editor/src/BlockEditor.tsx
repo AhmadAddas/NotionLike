@@ -35,6 +35,8 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   const sequence = useRef(Number(globalThis.localStorage?.getItem(`nl-sequence-${pageId}`) ?? "0"));
   const clientId = useRef(globalThis.localStorage?.getItem("nl-client-id") ?? crypto.randomUUID());
   const [ready, setReady] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : undefined, [token]);
 
   useEffect(() => {
@@ -128,6 +130,25 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
     immediatelyRender: false,
   }, [document, readOnly]);
 
+  const uploadFile = async (file: File) => {
+    if (!editor || file.size > 25_000_000) { onSyncState?.("error"); return; }
+    setUploading(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/pages/${pageId}/attachments/presign`, {
+        method: "POST", credentials: "include", headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream", size: file.size }),
+      });
+      if (!response.ok) throw new Error("Upload could not be prepared");
+      const target = await response.json() as { uploadUrl: string; publicUrl: string };
+      const upload = await fetch(target.uploadUrl, { method: "PUT", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
+      if (!upload.ok) throw new Error("Upload failed");
+      if (file.type.startsWith("image/")) editor.chain().focus().setImage({ src: target.publicUrl, alt: file.name, title: file.name }).run();
+      else editor.chain().focus().insertContent({ type: "paragraph", content: [{ type: "text", marks: [{ type: "link", attrs: { href: target.publicUrl, target: "_blank", rel: "noopener noreferrer" } }], text: `📎 ${file.name}` }] }).run();
+      onSyncState?.("saving");
+    } catch { onSyncState?.("error"); }
+    finally { setUploading(false); if (fileInput.current) fileInput.current.value = ""; }
+  };
+
   if (!ready || !editor) return <div className="editor-loading">Loading page…</div>;
   return <div className="block-editor">
     {!readOnly && <div className="editor-toolbar" role="toolbar" aria-label="Text formatting">
@@ -138,6 +159,8 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       <button onClick={() => editor.chain().focus().toggleTaskList().run()} aria-pressed={editor.isActive("taskList")}>To-do</button>
       <button onClick={() => editor.chain().focus().toggleCodeBlock().run()} aria-pressed={editor.isActive("codeBlock")}>Code</button>
       <button onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive("blockquote")}>Quote</button>
+      <button disabled={uploading} onClick={() => fileInput.current?.click()}>{uploading ? "Uploading…" : "File / PDF"}</button>
+      <input ref={fileInput} hidden type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
     </div>}
     <EditorContent editor={editor} />
   </div>;
