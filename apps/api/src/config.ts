@@ -9,7 +9,7 @@ export const config = {
   databaseUrl: required("DATABASE_URL", "postgres://notionlike:change-me@localhost:5432/notionlike"),
   appUrl: required("APP_URL", "http://localhost:3000"),
   allowRegistration: process.env.ALLOW_REGISTRATION !== "false",
-  secureCookies: process.env.NODE_ENV === "production",
+  secureCookies: process.env.NODE_ENV === "production" && process.env.SECURE_COOKIES !== "false",
   s3: {
     endpoint: required("S3_ENDPOINT", "http://localhost:9000"),
     publicUrl: required("S3_PUBLIC_URL", "http://localhost:9000"),
@@ -19,4 +19,3 @@ export const config = {
     secretKey: required("S3_SECRET_KEY", "change-me-too"),
   },
 };
-

@@ -10,4 +10,15 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - `packages/contracts` — shared validation and API types
 - `packages/editor` — shared Tiptap editor and mobile bridge
 
-See `docs/self-hosting.md` for deployment after the application phases are complete.
+## Quick start
+
+```sh
+cp .env.example .env
+# Replace all change-me values, then:
+docker compose build
+docker compose up -d
+```
+
+Open `http://localhost`. The API health endpoint is `http://localhost/health`.
+
+Development and validation commands run through pnpm (`pnpm typecheck`, `pnpm test`, and `pnpm build`). If Node.js is not installed locally, use the Docker images described in [docs/self-hosting.md](docs/self-hosting.md).
