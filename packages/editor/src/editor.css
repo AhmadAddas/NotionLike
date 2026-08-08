@@ -1,5 +1,5 @@
 .block-editor { position: relative; }
-.editor-toolbar { position: sticky; top: 52px; z-index: 5; display: flex; gap: 4px; width: max-content; padding: 5px; margin: 0 0 24px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: 0 6px 18px #00000012; }
+.editor-toolbar { position: sticky; top: 52px; z-index: 5; display: flex; flex-wrap: wrap; gap: 4px; width: fit-content; max-width: 100%; padding: 5px; margin: 0 0 24px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: 0 6px 18px #00000012; }
 .editor-toolbar button { border: 0; border-radius: 6px; padding: 6px 9px; color: var(--muted); background: transparent; cursor: pointer; }
 .editor-toolbar button:hover, .editor-toolbar button[aria-pressed="true"] { color: var(--text); background: var(--hover); }
 .tiptap { min-height: 55vh; outline: none; color: var(--text); font-size: 16px; line-height: 1.65; }
@@ -12,6 +12,11 @@
 .tiptap pre { overflow-x: auto; padding: 1rem; border-radius: 8px; color: #e8e8ea; background: #202124; }
 .tiptap code:not(pre code) { padding: 2px 5px; border-radius: 4px; background: var(--hover); }
 .tiptap img { max-width: 100%; border-radius: 8px; }
+.tiptap hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
+.tiptap table { border-collapse: collapse; table-layout: fixed; width: 100%; overflow: hidden; }.tiptap td,.tiptap th{border:1px solid var(--border);padding:7px 9px;vertical-align:top;position:relative}.tiptap th{background:var(--hover);font-weight:600}.tiptap .selectedCell:after{background:#6c8cff26;content:"";inset:0;pointer-events:none;position:absolute}
+.tiptap aside[data-callout]{display:flex;gap:12px;padding:14px 16px;border-radius:8px;background:var(--hover)}.callout-emoji{font-size:20px}.callout-content{flex:1}.callout-content>*:first-child{margin-top:0}
+.tiptap details[data-toggle]{padding:4px 0}.tiptap details summary{cursor:pointer;font-weight:500}.toggle-content{padding-left:22px}
+.file-attachment{margin:14px 0;border:1px solid var(--border);border-radius:9px;overflow:hidden}.file-attachment iframe{display:block;width:100%;height:480px;border:0}.file-attachment figcaption,.file-attachment>a{display:block;padding:10px 12px;color:var(--text);text-decoration:none;background:var(--surface)}
+.slash-menu{position:absolute;z-index:12;top:72px;left:0;width:310px;max-height:420px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface);box-shadow:0 14px 45px #0003}.slash-menu>strong{display:block;padding:6px 8px;color:var(--subtle);font-size:11px;text-transform:uppercase}.slash-menu button{display:grid;grid-template-columns:36px 1fr;gap:8px;width:100%;padding:7px;border:0;border-radius:7px;text-align:left;background:transparent;color:var(--text)}.slash-menu button:hover{background:var(--hover)}.slash-menu button>span{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:6px}.slash-menu button div{font-weight:500}.slash-menu small{display:block;color:var(--subtle);font-weight:400}
 .tiptap p.is-editor-empty:first-child::before { float: left; height: 0; color: var(--subtle); pointer-events: none; content: attr(data-placeholder); }
 .editor-loading { padding: 32px 0; color: var(--muted); }
-

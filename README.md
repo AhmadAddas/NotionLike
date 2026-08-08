@@ -10,10 +10,12 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 
 - Nested pages with icons, covers, favorites, archiving and optimistic revision checks.
 - Collaborative Tiptap/Yjs block editor.
-- Paragraphs, headings, bold, italic, links, ordered and unordered lists, task lists, quotes, code blocks and images.
+- Paragraphs, headings, bold, italic, underline, highlight, links, ordered and unordered lists, task lists, quotes, syntax-highlighted code blocks and images.
+- Slash-command insertion menu with text, headings, lists, tasks, dividers, tables, callouts, toggles and attachments.
+- Editable simple tables, collapsible toggle blocks, callouts and horizontal dividers.
 - Offline editor persistence in IndexedDB and durable server-side Yjs updates.
 - Live document updates and basic collaborator presence.
-- File uploads to self-hosted S3/MinIO, including inline images and downloadable PDF/document attachments.
+- File uploads to self-hosted S3/MinIO, including inline images, inline PDF previews and downloadable document attachments.
 - Page search, public read-only links, named versions and version restoration APIs.
 - Markdown, HTML and text note import; Markdown, HTML and JSON page export.
 
@@ -61,7 +63,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Search does not yet provide complete full-text indexing of editor documents, comments and database values.
 - Page history has snapshots/restoration APIs but no visual diff or complete history browser.
 - Offline support is strongest for an already-open editor. Complete offline workspace navigation, databases, attachments and conflict resolution are unfinished.
-- PDF files are downloadable attachments; there is no inline PDF renderer or PDF-to-text conversion.
+- PDF files can be previewed inline, but PDF text extraction, annotation and full-screen reading are not implemented.
 - Imported Markdown/HTML supports basic text structure and does not preserve every rich block or asset.
 - Export is per page; full workspace ZIP export is not available.
 - Public pages do not yet offer site navigation, themes, SEO controls, analytics or custom-domain management UI.
@@ -77,13 +79,13 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 
 ### Editor parity
 
-- Slash-command menu, block insertion controls and drag handles.
+- Block insertion controls and drag handles.
 - Multi-block selection, duplication, movement and block transformation.
-- Toggle blocks/headings, callouts, dividers, columns and simple tables.
+- Toggle headings and multi-column layouts.
 - Table of contents, breadcrumbs, equations, buttons and reusable templates.
 - Synced blocks, backlinks, page mentions, user mentions and reminders.
-- Inline PDF/audio/video viewers, captions, resizing, bookmarks and rich embeds.
-- Better code-block languages, syntax highlighting, colors and typography controls.
+- Audio/video viewers, captions, resizing, bookmarks and rich embeds.
+- Code-language selection, more colors and typography controls.
 
 ### Database and project parity
 
@@ -137,6 +139,7 @@ Completed implementation phases:
 6. Collaboration, identity, invitations, permissions, comments, presence and notifications.
 7. Structured databases, views, forms and automations.
 8. File/PDF uploads, imports, exports and plugin manifests.
+9. Rich editor blocks, slash commands, simple tables and inline PDF previews.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 

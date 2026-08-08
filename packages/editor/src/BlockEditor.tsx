@@ -9,7 +9,11 @@ import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import Underline from "@tiptap/extension-underline";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
 import * as Y from "yjs";
+import { Callout, FileAttachment, HighlightMark, TableCell, TableHeader, TableNode, TableRow, ToggleBlock } from "./extensions";
 
 export type SyncState = "loading" | "offline" | "saving" | "saved" | "error";
 export type BlockEditorProps = {
@@ -29,6 +33,7 @@ const toBase64 = (value: Uint8Array) => {
   value.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary);
 };
+const lowlight = createLowlight(common);
 
 export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initialUpdate, onSyncState, user, onPresence }: BlockEditorProps) {
   const document = useMemo(() => new Y.Doc(), [pageId]);
@@ -36,6 +41,7 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   const clientId = useRef(globalThis.localStorage?.getItem("nl-client-id") ?? crypto.randomUUID());
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : undefined, [token]);
 
@@ -122,12 +128,15 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ undoRedo: false, link: false }), Collaboration.configure({ document }),
+      StarterKit.configure({ undoRedo: false, link: false, codeBlock: false }), Collaboration.configure({ document }),
       Link.configure({ openOnClick: false, autolink: true }), Image.configure({ allowBase64: false }),
       Placeholder.configure({ placeholder: "Type '/' for commands…" }), TaskList, TaskItem.configure({ nested: true }),
+      Underline, HighlightMark, TableNode, TableRow, TableHeader, TableCell,
+      CodeBlockLowlight.configure({ lowlight }), Callout, ToggleBlock, FileAttachment,
     ],
     editable: !readOnly,
     immediatelyRender: false,
+    editorProps: { handleKeyDown: (_view, event) => { if (event.key === "/") setSlashOpen(true); if (event.key === "Escape") setSlashOpen(false); return false; } },
   }, [document, readOnly]);
 
   const uploadFile = async (file: File) => {
@@ -143,24 +152,42 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       const upload = await fetch(target.uploadUrl, { method: "PUT", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
       if (!upload.ok) throw new Error("Upload failed");
       if (file.type.startsWith("image/")) editor.chain().focus().setImage({ src: target.publicUrl, alt: file.name, title: file.name }).run();
-      else editor.chain().focus().insertContent({ type: "paragraph", content: [{ type: "text", marks: [{ type: "link", attrs: { href: target.publicUrl, target: "_blank", rel: "noopener noreferrer" } }], text: `📎 ${file.name}` }] }).run();
+      else editor.chain().focus().insertContent({ type: "fileAttachment", attrs: { src: target.publicUrl, name: file.name, mime: file.type, size: file.size } }).run();
       onSyncState?.("saving");
     } catch { onSyncState?.("error"); }
     finally { setUploading(false); if (fileInput.current) fileInput.current.value = ""; }
   };
 
   if (!ready || !editor) return <div className="editor-loading">Loading page…</div>;
+  const removeSlash = () => { const { from } = editor.state.selection; if (from > 0 && editor.state.doc.textBetween(from - 1, from) === "/") editor.chain().focus().deleteRange({ from: from - 1, to: from }).run(); setSlashOpen(false); };
+  const command = (action: () => void) => { removeSlash(); action(); };
+  const setLink = () => { const href = prompt("Link URL", editor.getAttributes("link").href ?? "https://"); if (href === null) return; if (!href) editor.chain().focus().unsetLink().run(); else editor.chain().focus().extendMarkRange("link").setLink({ href }).run(); };
   return <div className="block-editor">
     {!readOnly && <div className="editor-toolbar" role="toolbar" aria-label="Text formatting">
       <button onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive("bold")}><strong>B</strong></button>
       <button onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive("italic")}><em>I</em></button>
+      <button onClick={() => editor.chain().focus().toggleUnderline().run()} aria-pressed={editor.isActive("underline")}><u>U</u></button>
+      <button onClick={() => editor.chain().focus().toggleMark("highlight").run()} aria-pressed={editor.isActive("highlight")}>Highlight</button>
+      <button onClick={setLink} aria-pressed={editor.isActive("link")}>Link</button>
       <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} aria-pressed={editor.isActive("heading", { level: 2 })}>H2</button>
       <button onClick={() => editor.chain().focus().toggleBulletList().run()} aria-pressed={editor.isActive("bulletList")}>List</button>
       <button onClick={() => editor.chain().focus().toggleTaskList().run()} aria-pressed={editor.isActive("taskList")}>To-do</button>
       <button onClick={() => editor.chain().focus().toggleCodeBlock().run()} aria-pressed={editor.isActive("codeBlock")}>Code</button>
       <button onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive("blockquote")}>Quote</button>
+      <button onClick={() => editor.chain().focus().setHorizontalRule().run()}>Divider</button>
       <button disabled={uploading} onClick={() => fileInput.current?.click()}>{uploading ? "Uploading…" : "File / PDF"}</button>
       <input ref={fileInput} hidden type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
+    </div>}
+    {slashOpen && !readOnly && <div className="slash-menu" role="menu"><strong>Basic blocks</strong>
+      <button onClick={() => command(() => editor.chain().focus().setParagraph().run())}><span>¶</span><div>Text<small>Plain paragraph</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}><span>H1</span><div>Heading 1<small>Large section heading</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().toggleBulletList().run())}><span>•</span><div>Bulleted list<small>Create a simple list</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().toggleTaskList().run())}><span>☑</span><div>To-do list<small>Track a task</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().setHorizontalRule().run())}><span>—</span><div>Divider<small>Separate sections</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "table", content: Array.from({ length: 3 }, (_, row) => ({ type: "tableRow", content: Array.from({ length: 3 }, () => ({ type: row === 0 ? "tableHeader" : "tableCell", content: [{ type: "paragraph" }] })) })) }).run())}><span>▦</span><div>Table<small>Insert a simple table</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "callout", content: [{ type: "paragraph" }] }).run())}><span>💡</span><div>Callout<small>Emphasize information</small></div></button>
+      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "toggleBlock", attrs: { summary: "Toggle" }, content: [{ type: "paragraph" }] }).run())}><span>▶</span><div>Toggle<small>Collapsible content</small></div></button>
+      <button onClick={() => { removeSlash(); fileInput.current?.click(); }}><span>📎</span><div>File or PDF<small>Upload an attachment</small></div></button>
     </div>}
     <EditorContent editor={editor} />
   </div>;
