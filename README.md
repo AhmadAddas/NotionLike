@@ -24,6 +24,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Workspace databases with rows and typed property definitions.
 - Table, board, calendar, list and gallery views.
 - Property definitions for title, text, number, select, multi-select, status, date, checkbox, URL, email, people, files, relation, formula and rollup.
+- Same-database row relations, safe arithmetic formulas and rollup aggregations for count, sum, average, minimum, maximum and displayed values.
 - Saved view configuration, sorting metadata and grouping metadata.
 - Persistent compound filters, multi-column sorting, grouping and numeric totals.
 - Drag-and-drop status boards and a navigable month calendar with drag-to-reschedule.
@@ -52,7 +53,8 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 
 ## Known bugs and limitations
 
-- Database relation, formula and rollup types are declared but are not evaluated yet.
+- Relations currently use row IDs and target rows in the same database; cross-database relation browsing and automatic bidirectional properties are unfinished.
+- Formulas currently support safe arithmetic and property references, not the complete Notion-style formula language for strings, dates and collections.
 - Database view controls cover filters, sorts and grouping, but do not yet support nested AND/OR filter groups or every property-specific operator.
 - Calendar supports month navigation and drag-to-reschedule, but week/day layouts and recurring events are not implemented.
 - Forms and automations have backend APIs but no complete visual builders.
@@ -90,7 +92,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 
 ### Database and project parity
 
-- Real relations, bidirectional relations, formulas, rollups and aggregations.
+- Cross-database and bidirectional relations plus a complete formula language for strings, dates, conditions and collections.
 - Nested AND/OR filter groups and property-specific calculations beyond count and sum.
 - Timeline, chart and dashboard views.
 - Week/day calendar layouts and recurring calendar events.
@@ -142,6 +144,7 @@ Completed implementation phases:
 8. File/PDF uploads, imports, exports and plugin manifests.
 9. Rich editor blocks, slash commands, simple tables and inline PDF previews.
 10. Advanced database filters, sorting, grouping, totals, board drag-and-drop and month calendar.
+11. Functional same-database relations, safe arithmetic formulas and rollup aggregations.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 
