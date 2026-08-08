@@ -1,6 +1,144 @@
-# NotionLike
+# NotionLike — Work in Progress
 
-A self-hosted workspace for nested pages, block editing, offline-safe synchronization, search, sharing, and Android access.
+> **WIP:** NotionLike is an actively developed, self-hosted collaborative workspace. It is an MVP and is **not yet a complete Notion or AppFlowy replacement**. Do not use it as the only copy of important data without tested backups.
+
+A self-hosted workspace for nested pages, block editing, offline-safe synchronization, structured databases, collaboration, sharing, and Android access. AI features and third-party integrations are intentionally out of scope.
+
+## Current features
+
+### Pages and editor
+
+- Nested pages with icons, covers, favorites, archiving and optimistic revision checks.
+- Collaborative Tiptap/Yjs block editor.
+- Paragraphs, headings, bold, italic, links, ordered and unordered lists, task lists, quotes, code blocks and images.
+- Offline editor persistence in IndexedDB and durable server-side Yjs updates.
+- Live document updates and basic collaborator presence.
+- File uploads to self-hosted S3/MinIO, including inline images and downloadable PDF/document attachments.
+- Page search, public read-only links, named versions and version restoration APIs.
+- Markdown, HTML and text note import; Markdown, HTML and JSON page export.
+
+### Structured databases
+
+- Workspace databases with rows and typed property definitions.
+- Table, board, calendar, list and gallery views.
+- Property definitions for title, text, number, select, multi-select, status, date, checkbox, URL, email, people, files, relation, formula and rollup.
+- Saved view configuration, sorting metadata and grouping metadata.
+- Public form and response APIs.
+- Basic property-change automations with set-property and notification actions.
+
+### Collaboration and identity
+
+- Email/password registration and authentication.
+- Password recovery through configurable SMTP.
+- Generic OpenID Connect SSO for self-hosted identity providers.
+- Workspace invitations and invitation acceptance.
+- Owner, admin, member and guest workspace roles.
+- Inherited page permissions: view, comment, edit and full access.
+- Threaded page/block comments, replies and resolution.
+- In-app notifications and read state.
+- Workspace audit-log API and profile locale/timezone settings.
+
+### Clients and operations
+
+- Responsive Next.js web application.
+- Expo React Native Android application using the shared editor bridge.
+- Docker Compose deployment with Caddy, PostgreSQL and MinIO.
+- Health/readiness endpoints, database migrations, backup and restore scripts.
+- Declarative, capability-limited workspace plugin manifests with enable/disable controls.
+
+## Known bugs and limitations
+
+- Database relation, formula and rollup types are declared but are not evaluated yet.
+- Database filtering and sorting are minimal; most view configuration does not yet have a visual editor.
+- Board cards cannot be dragged between groups, and calendar entries cannot be dragged between dates.
+- Calendar is a simple card layout, not a complete month/week/day calendar.
+- Forms and automations have backend APIs but no complete visual builders.
+- Database rows are not yet full editable pages with their own document bodies.
+- Live presence shows viewers, but not remote cursors, selections or block-level activity.
+- WebSocket reconnection and large-room scaling are not production-hardened.
+- Comments do not have text-range anchoring, mentions, reactions or attachments.
+- Notifications are in-app only; email and mobile push delivery are not implemented.
+- Search does not yet provide complete full-text indexing of editor documents, comments and database values.
+- Page history has snapshots/restoration APIs but no visual diff or complete history browser.
+- Offline support is strongest for an already-open editor. Complete offline workspace navigation, databases, attachments and conflict resolution are unfinished.
+- PDF files are downloadable attachments; there is no inline PDF renderer or PDF-to-text conversion.
+- Imported Markdown/HTML supports basic text structure and does not preserve every rich block or asset.
+- Export is per page; full workspace ZIP export is not available.
+- Public pages do not yet offer site navigation, themes, SEO controls, analytics or custom-domain management UI.
+- The plugin system validates and stores manifests, but it does not yet execute UI extensions or provide a complete sandboxed SDK.
+- OIDC is supported, but SAML, SCIM, domain claiming and enterprise authentication policies are not.
+- File upload size is currently limited to 25 MB.
+- Android is an early Expo client; native sharing, widgets, capture, push notifications and background sync are unfinished.
+- There are no iOS or desktop clients and no browser web clipper.
+- Automated coverage is limited; collaboration, permissions, migrations and offline conflict cases need broader integration and end-to-end tests.
+- Self-hosted upgrades currently use startup migrations and do not provide zero-downtime orchestration or an administration dashboard.
+
+## Pending work
+
+### Editor parity
+
+- Slash-command menu, block insertion controls and drag handles.
+- Multi-block selection, duplication, movement and block transformation.
+- Toggle blocks/headings, callouts, dividers, columns and simple tables.
+- Table of contents, breadcrumbs, equations, buttons and reusable templates.
+- Synced blocks, backlinks, page mentions, user mentions and reminders.
+- Inline PDF/audio/video viewers, captions, resizing, bookmarks and rich embeds.
+- Better code-block languages, syntax highlighting, colors and typography controls.
+
+### Database and project parity
+
+- Real relations, bidirectional relations, formulas, rollups and aggregations.
+- Complete filters, compound conditions, sorting, grouping and calculations.
+- Timeline, chart and dashboard views.
+- Drag-and-drop board and calendar interaction.
+- Configurable card previews and visible properties.
+- Database row pages, database templates, linked database views and buttons.
+- Complete form builder, validation, response management and public form UI.
+- Visual automation builder, schedules, recurring triggers, conditions, logs and retries.
+- Recurring tasks, dependencies, milestones and project reporting.
+
+### Collaboration, security and administration
+
+- Remote cursors/selections, presence reconnection and horizontally scalable collaboration rooms.
+- Comment mentions, text-range annotations, reactions, attachments and subscriptions.
+- Notification preferences, grouping, email delivery and Android push notifications.
+- User groups, teamspaces, permission diagnostics and a complete guest-management UI.
+- Visual version history/diffs and more granular restore tools.
+- SAML, SCIM, domain verification, enforced policies and session/device management.
+- Audit-log UI, retention policies, legal holds, workspace analytics and security dashboards.
+- Admin UI for registration, SMTP, storage, OIDC, jobs, backups and system health.
+
+### Portability, publishing and extensibility
+
+- Notion/AppFlowy workspace importers, CSV database import and ZIP asset imports.
+- Full workspace export, scheduled exports and backup management UI.
+- Template gallery and workspace/page/database template creation.
+- Published sites with navigation, themes, SEO, analytics and custom domains.
+- Localization of the complete interface and right-to-left layout support.
+- Sandboxed plugin runtime, versioned SDK, permission prompts, lifecycle hooks and plugin marketplace.
+
+### Clients and offline
+
+- Production-quality Android UX with native navigation, capture/share targets, background sync and notifications.
+- iOS client.
+- Native Windows, macOS and Linux desktop clients.
+- Browser extension/web clipper.
+- Explicit offline downloads, attachment queues, database caches, offline search and conflict-resolution UI.
+
+## Current development status
+
+Completed implementation phases:
+
+1. Monorepo foundation.
+2. API, authentication, pages and Yjs synchronization.
+3. Responsive web workspace and offline editor.
+4. Android client and editor bridge.
+5. Production self-hosting stack.
+6. Collaboration, identity, invitations, permissions, comments, presence and notifications.
+7. Structured databases, views, forms and automations.
+8. File/PDF uploads, imports, exports and plugin manifests.
+
+The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 
 ## Repository
 
@@ -20,5 +158,7 @@ docker compose up -d
 ```
 
 Open `http://localhost`. The API health endpoint is `http://localhost/health`.
+
+Before exposing the service publicly, configure strong PostgreSQL/MinIO passwords, HTTPS, SMTP if recovery is needed, backups and an OIDC provider if SSO is required. See [the self-hosting guide](docs/self-hosting.md).
 
 Development and validation commands run through pnpm (`pnpm typecheck`, `pnpm test`, and `pnpm build`). If Node.js is not installed locally, use the Docker images described in [docs/self-hosting.md](docs/self-hosting.md).
