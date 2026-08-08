@@ -25,6 +25,8 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Table, board, calendar, list and gallery views.
 - Property definitions for title, text, number, select, multi-select, status, date, checkbox, URL, email, people, files, relation, formula and rollup.
 - Saved view configuration, sorting metadata and grouping metadata.
+- Persistent compound filters, multi-column sorting, grouping and numeric totals.
+- Drag-and-drop status boards and a navigable month calendar with drag-to-reschedule.
 - Public form and response APIs.
 - Basic property-change automations with set-property and notification actions.
 
@@ -51,9 +53,8 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 ## Known bugs and limitations
 
 - Database relation, formula and rollup types are declared but are not evaluated yet.
-- Database filtering and sorting are minimal; most view configuration does not yet have a visual editor.
-- Board cards cannot be dragged between groups, and calendar entries cannot be dragged between dates.
-- Calendar is a simple card layout, not a complete month/week/day calendar.
+- Database view controls cover filters, sorts and grouping, but do not yet support nested AND/OR filter groups or every property-specific operator.
+- Calendar supports month navigation and drag-to-reschedule, but week/day layouts and recurring events are not implemented.
 - Forms and automations have backend APIs but no complete visual builders.
 - Database rows are not yet full editable pages with their own document bodies.
 - Live presence shows viewers, but not remote cursors, selections or block-level activity.
@@ -90,9 +91,9 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 ### Database and project parity
 
 - Real relations, bidirectional relations, formulas, rollups and aggregations.
-- Complete filters, compound conditions, sorting, grouping and calculations.
+- Nested AND/OR filter groups and property-specific calculations beyond count and sum.
 - Timeline, chart and dashboard views.
-- Drag-and-drop board and calendar interaction.
+- Week/day calendar layouts and recurring calendar events.
 - Configurable card previews and visible properties.
 - Database row pages, database templates, linked database views and buttons.
 - Complete form builder, validation, response management and public form UI.
@@ -140,6 +141,7 @@ Completed implementation phases:
 7. Structured databases, views, forms and automations.
 8. File/PDF uploads, imports, exports and plugin manifests.
 9. Rich editor blocks, slash commands, simple tables and inline PDF previews.
+10. Advanced database filters, sorting, grouping, totals, board drag-and-drop and month calendar.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 
