@@ -11,7 +11,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Nested pages with icons, covers, favorites, archiving and optimistic revision checks.
 - Collaborative Tiptap/Yjs block editor.
 - Paragraphs, headings, bold, italic, underline, highlight, links, ordered and unordered lists, task lists, quotes, syntax-highlighted code blocks and images.
-- Slash-command insertion menu with text, headings, lists, tasks, dividers, tables, callouts, toggles and attachments.
+- Searchable, grouped slash-command palette with aliases, keyboard navigation and commands for text, headings, lists, tasks, quotes, code, dividers, tables, callouts, toggles, images, PDFs and files.
 - Editable simple tables, collapsible toggle blocks, callouts and horizontal dividers.
 - Offline editor persistence in IndexedDB and durable server-side Yjs updates.
 - Live document updates and basic collaborator presence.
@@ -149,8 +149,9 @@ Completed implementation phases:
 12. Page-backed database rows with collaborative document bodies.
 13. Public database forms with typed response collection.
 14. Visual property-change and recurring automations with execution history.
+15. Searchable, cursor-positioned slash-command palette with keyboard controls and expanded block commands.
 
-The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
+The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated.
 
 ## Repository
 

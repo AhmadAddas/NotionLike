@@ -34,6 +34,7 @@ const toBase64 = (value: Uint8Array) => {
   return btoa(binary);
 };
 const lowlight = createLowlight(common);
+type SlashCommand = { id: string; label: string; description: string; icon: string; group: "Basic" | "Lists" | "Media" | "Advanced"; aliases: string[]; run: () => void };
 
 export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initialUpdate, onSyncState, user, onPresence }: BlockEditorProps) {
   const document = useMemo(() => new Y.Doc(), [pageId]);
@@ -42,6 +43,13 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashPosition, setSlashPosition] = useState({ left: 0, top: 0 });
+  const slashRange = useRef<{ from: number; to: number } | null>(null);
+  const slashCommandsRef = useRef<SlashCommand[]>([]);
+  const slashIndexRef = useRef(0);
+  const slashMenu = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : undefined, [token]);
 
@@ -136,8 +144,33 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
     ],
     editable: !readOnly,
     immediatelyRender: false,
-    editorProps: { handleKeyDown: (_view, event) => { if (event.key === "/") setSlashOpen(true); if (event.key === "Escape") setSlashOpen(false); return false; } },
+    onUpdate: ({ editor: current }) => {
+      const { from } = current.state.selection;
+      const start = Math.max(0, from - 80);
+      const before = current.state.doc.textBetween(start, from, "\n", "\0");
+      const match = before.match(/(?:^|\s)\/([a-z0-9-]*)$/i);
+      if (!match) { setSlashOpen(false); slashRange.current = null; return; }
+      const query = match[1] ?? "";
+      slashRange.current = { from: from - query.length - 1, to: from };
+      const coordinates = current.view.coordsAtPos(from);
+      setSlashPosition({ left: coordinates.left, top: coordinates.bottom + 6 });
+      setSlashQuery(query); setSlashIndex(0); slashIndexRef.current = 0; setSlashOpen(true);
+    },
+    editorProps: { handleKeyDown: (_view, event) => {
+      if (!slashRange.current && event.key === "/") return false;
+      if (!slashRange.current) return false;
+      const commands = slashCommandsRef.current;
+      if (event.key === "ArrowDown") { event.preventDefault(); const next=(slashIndexRef.current+1)%Math.max(commands.length,1);slashIndexRef.current=next;setSlashIndex(next);return true; }
+      if (event.key === "ArrowUp") { event.preventDefault(); const next=(slashIndexRef.current-1+Math.max(commands.length,1))%Math.max(commands.length,1);slashIndexRef.current=next;setSlashIndex(next);return true; }
+      if ((event.key === "Enter" || event.key === "Tab") && commands.length) { event.preventDefault(); commands[slashIndexRef.current]?.run(); return true; }
+      if (event.key === "Escape") { event.preventDefault(); slashRange.current=null;setSlashOpen(false);return true; }
+      return false;
+    } },
   }, [document, readOnly]);
+
+  useEffect(() => {
+    slashMenu.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [slashIndex, slashQuery]);
 
   const uploadFile = async (file: File) => {
     if (!editor || file.size > 25_000_000) { onSyncState?.("error"); return; }
@@ -159,9 +192,28 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   };
 
   if (!ready || !editor) return <div className="editor-loading">Loading page…</div>;
-  const removeSlash = () => { const { from } = editor.state.selection; if (from > 0 && editor.state.doc.textBetween(from - 1, from) === "/") editor.chain().focus().deleteRange({ from: from - 1, to: from }).run(); setSlashOpen(false); };
+  const removeSlash = () => { const range=slashRange.current;if(range)editor.chain().focus().deleteRange(range).run();slashRange.current=null;setSlashOpen(false);setSlashQuery(""); };
   const command = (action: () => void) => { removeSlash(); action(); };
   const setLink = () => { const href = prompt("Link URL", editor.getAttributes("link").href ?? "https://"); if (href === null) return; if (!href) editor.chain().focus().unsetLink().run(); else editor.chain().focus().extendMarkRange("link").setLink({ href }).run(); };
+  const tableContent={ type:"table",content:Array.from({length:3},(_,row)=>({type:"tableRow",content:Array.from({length:3},()=>({type:row===0?"tableHeader":"tableCell",content:[{type:"paragraph"}]}))})) };
+  const commands:SlashCommand[]=[
+    {id:"text",label:"Text",description:"Plain paragraph",icon:"¶",group:"Basic",aliases:["paragraph","plain"],run:()=>command(()=>editor.chain().focus().setParagraph().run())},
+    ...([1,2,3] as const).map(level=>({id:`heading-${level}`,label:`Heading ${level}`,description:`${level===1?"Large":level===2?"Medium":"Small"} section heading`,icon:`H${level}`,group:"Basic" as const,aliases:[`h${level}`,"title"],run:()=>command(()=>editor.chain().focus().toggleHeading({level}).run())})),
+    {id:"bullet",label:"Bulleted list",description:"Create a simple list",icon:"•",group:"Lists",aliases:["ul","unordered"],run:()=>command(()=>editor.chain().focus().toggleBulletList().run())},
+    {id:"numbered",label:"Numbered list",description:"Create an ordered list",icon:"1.",group:"Lists",aliases:["ol","ordered"],run:()=>command(()=>editor.chain().focus().toggleOrderedList().run())},
+    {id:"todo",label:"To-do list",description:"Track tasks",icon:"☑",group:"Lists",aliases:["task","checkbox"],run:()=>command(()=>editor.chain().focus().toggleTaskList().run())},
+    {id:"quote",label:"Quote",description:"Capture a quotation",icon:"❝",group:"Basic",aliases:["blockquote"],run:()=>command(()=>editor.chain().focus().toggleBlockquote().run())},
+    {id:"code",label:"Code",description:"Syntax-highlighted code block",icon:"</>",group:"Basic",aliases:["pre","snippet"],run:()=>command(()=>editor.chain().focus().toggleCodeBlock().run())},
+    {id:"divider",label:"Divider",description:"Separate sections",icon:"—",group:"Basic",aliases:["hr","line"],run:()=>command(()=>editor.chain().focus().setHorizontalRule().run())},
+    {id:"table",label:"Table",description:"Insert a 3 × 3 table",icon:"▦",group:"Advanced",aliases:["grid"],run:()=>command(()=>editor.chain().focus().insertContent(tableContent).run())},
+    {id:"callout",label:"Callout",description:"Emphasize information",icon:"💡",group:"Advanced",aliases:["note","info"],run:()=>command(()=>editor.chain().focus().insertContent({type:"callout",content:[{type:"paragraph"}]}).run())},
+    {id:"toggle",label:"Toggle",description:"Collapsible content",icon:"▶",group:"Advanced",aliases:["details","collapse"],run:()=>command(()=>editor.chain().focus().insertContent({type:"toggleBlock",attrs:{summary:"Toggle"},content:[{type:"paragraph"}]}).run())},
+    {id:"image",label:"Image",description:"Upload and display an image",icon:"▧",group:"Media",aliases:["photo","picture","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
+    {id:"pdf",label:"PDF",description:"Upload and preview a PDF",icon:"PDF",group:"Media",aliases:["document","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
+    {id:"file",label:"File",description:"Upload a downloadable attachment",icon:"📎",group:"Media",aliases:["attachment","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
+  ];
+  const normalized=slashQuery.toLowerCase();const filtered=commands.filter(item=>!normalized||[item.label,item.id,...item.aliases].some(value=>value.toLowerCase().includes(normalized)));
+  const activeIndex=Math.min(slashIndex,Math.max(filtered.length-1,0));slashCommandsRef.current=filtered;slashIndexRef.current=activeIndex;
   return <div className="block-editor">
     {!readOnly && <div className="editor-toolbar" role="toolbar" aria-label="Text formatting">
       <button onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive("bold")}><strong>B</strong></button>
@@ -178,16 +230,18 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       <button disabled={uploading} onClick={() => fileInput.current?.click()}>{uploading ? "Uploading…" : "File / PDF"}</button>
       <input ref={fileInput} hidden type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
     </div>}
-    {slashOpen && !readOnly && <div className="slash-menu" role="menu"><strong>Basic blocks</strong>
-      <button onClick={() => command(() => editor.chain().focus().setParagraph().run())}><span>¶</span><div>Text<small>Plain paragraph</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}><span>H1</span><div>Heading 1<small>Large section heading</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().toggleBulletList().run())}><span>•</span><div>Bulleted list<small>Create a simple list</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().toggleTaskList().run())}><span>☑</span><div>To-do list<small>Track a task</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().setHorizontalRule().run())}><span>—</span><div>Divider<small>Separate sections</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "table", content: Array.from({ length: 3 }, (_, row) => ({ type: "tableRow", content: Array.from({ length: 3 }, () => ({ type: row === 0 ? "tableHeader" : "tableCell", content: [{ type: "paragraph" }] })) })) }).run())}><span>▦</span><div>Table<small>Insert a simple table</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "callout", content: [{ type: "paragraph" }] }).run())}><span>💡</span><div>Callout<small>Emphasize information</small></div></button>
-      <button onClick={() => command(() => editor.chain().focus().insertContent({ type: "toggleBlock", attrs: { summary: "Toggle" }, content: [{ type: "paragraph" }] }).run())}><span>▶</span><div>Toggle<small>Collapsible content</small></div></button>
-      <button onClick={() => { removeSlash(); fileInput.current?.click(); }}><span>📎</span><div>File or PDF<small>Upload an attachment</small></div></button>
+    {slashOpen && !readOnly && <div ref={slashMenu} className="slash-menu" role="menu" aria-label="Insert block" style={slashPosition}>
+      <div className="slash-menu-query"><span>/</span>{slashQuery || "Type to filter"}</div>
+      {filtered.length ? (["Basic","Lists","Media","Advanced"] as const).map(group => {
+        const items=filtered.filter(item=>item.group===group);if(!items.length)return null;
+        return <div className="slash-menu-group" key={group}><strong>{group}</strong>{items.map(item=>{
+          const index=filtered.indexOf(item);return <button key={item.id} role="menuitem" aria-selected={index===activeIndex}
+            onMouseDown={event=>event.preventDefault()} onMouseEnter={()=>{slashIndexRef.current=index;setSlashIndex(index)}} onClick={item.run}>
+            <span>{item.icon}</span><div>{item.label}<small>{item.description}</small></div>
+          </button>;
+        })}</div>;
+      }) : <div className="slash-menu-empty">No commands match “{slashQuery}”</div>}
+      <div className="slash-menu-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> select</span><span><kbd>Esc</kbd> close</span></div>
     </div>}
     <EditorContent editor={editor} />
   </div>;
