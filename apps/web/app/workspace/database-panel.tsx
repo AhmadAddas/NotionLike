@@ -1,49 +1,1045 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Columns3, Filter, Grid2X2, List, Plus, Settings2, Table2, Trash2, X } from "lucide-react";
-import type { Database, DatabaseProperty, DatabaseRow, DatabaseView, PropertyType } from "@notionlike/contracts";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Columns3,
+  Filter,
+  FileText,
+  Grid2X2,
+  List,
+  Plus,
+  Settings2,
+  Table2,
+  Trash2,
+  X,
+} from "lucide-react";
+import type {
+  Database,
+  DatabaseProperty,
+  DatabaseRow,
+  DatabaseView,
+  PropertyType,
+} from "@notionlike/contracts";
 import { api } from "../../lib/api";
 
-const propertyTypes: PropertyType[] = ["text","number","select","multi_select","status","date","checkbox","url","email","person","files","relation","formula","rollup"];
-const viewIcons = { table: Table2, board: Columns3, calendar: CalendarDays, list: List, gallery: Grid2X2 };
-type ViewFilter = { propertyId: string; operator: "equals"|"not_equals"|"contains"|"empty"|"not_empty"|"greater"|"less"|"before"|"after"; value?: unknown };
-type ViewSort = { propertyId: string; direction: "asc"|"desc" };
+const propertyTypes: PropertyType[] = [
+  "text",
+  "number",
+  "select",
+  "multi_select",
+  "status",
+  "date",
+  "checkbox",
+  "url",
+  "email",
+  "person",
+  "files",
+  "relation",
+  "formula",
+  "rollup",
+];
+const viewIcons = {
+  table: Table2,
+  board: Columns3,
+  calendar: CalendarDays,
+  list: List,
+  gallery: Grid2X2,
+};
+type ViewFilter = {
+  propertyId: string;
+  operator:
+    | "equals"
+    | "not_equals"
+    | "contains"
+    | "empty"
+    | "not_empty"
+    | "greater"
+    | "less"
+    | "before"
+    | "after";
+  value?: unknown;
+};
+type ViewSort = { propertyId: string; direction: "asc" | "desc" };
 
-const propertyOptions = (property?: DatabaseProperty) => (property?.config.options as Array<{name:string;color?:string}>|undefined) ?? [{name:"Not started"},{name:"In progress"},{name:"Done"}];
-const compare = (left: unknown, right: unknown) => typeof left === "number" && typeof right === "number" ? left-right : String(left??"").localeCompare(String(right??""), undefined, { numeric: true });
-const matches = (value: unknown, filter: ViewFilter) => { const text=String(value??"").toLowerCase(); const expected=String(filter.value??"").toLowerCase(); switch(filter.operator){case"equals":return text===expected;case"not_equals":return text!==expected;case"contains":return text.includes(expected);case"empty":return value===null||value===undefined||value===""||(Array.isArray(value)&&!value.length);case"not_empty":return value!==null&&value!==undefined&&value!==""&&(!Array.isArray(value)||value.length>0);case"greater":return compare(value,filter.value)>0;case"less":return compare(value,filter.value)<0;case"before":return new Date(String(value)).getTime()<new Date(String(filter.value)).getTime();case"after":return new Date(String(value)).getTime()>new Date(String(filter.value)).getTime();} };
+const propertyOptions = (property?: DatabaseProperty) =>
+  (property?.config.options as
+    | Array<{ name: string; color?: string }>
+    | undefined) ?? [
+    { name: "Not started" },
+    { name: "In progress" },
+    { name: "Done" },
+  ];
+const compare = (left: unknown, right: unknown) =>
+  typeof left === "number" && typeof right === "number"
+    ? left - right
+    : String(left ?? "").localeCompare(String(right ?? ""), undefined, {
+        numeric: true,
+      });
+const matches = (value: unknown, filter: ViewFilter) => {
+  const text = String(value ?? "").toLowerCase();
+  const expected = String(filter.value ?? "").toLowerCase();
+  switch (filter.operator) {
+    case "equals":
+      return text === expected;
+    case "not_equals":
+      return text !== expected;
+    case "contains":
+      return text.includes(expected);
+    case "empty":
+      return (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        (Array.isArray(value) && !value.length)
+      );
+    case "not_empty":
+      return (
+        value !== null &&
+        value !== undefined &&
+        value !== "" &&
+        (!Array.isArray(value) || value.length > 0)
+      );
+    case "greater":
+      return compare(value, filter.value) > 0;
+    case "less":
+      return compare(value, filter.value) < 0;
+    case "before":
+      return (
+        new Date(String(value)).getTime() <
+        new Date(String(filter.value)).getTime()
+      );
+    case "after":
+      return (
+        new Date(String(value)).getTime() >
+        new Date(String(filter.value)).getTime()
+      );
+  }
+};
 
-function Cell({ property, value, onChange }: { property: DatabaseProperty; value: unknown; onChange: (value: unknown) => void }) {
-  if (["formula","rollup"].includes(property.type)) return <span className="computed-cell">{String(value??"—")}</span>;
-  if (property.type === "checkbox") return <input type="checkbox" checked={Boolean(value)} onChange={event=>onChange(event.target.checked)} />;
-  if (property.type === "number") return <input type="number" value={String(value??"")} onChange={event=>onChange(event.target.value ? Number(event.target.value) : null)} />;
-  if (property.type === "date") return <input type="date" value={String(value??"").slice(0,10)} onChange={event=>onChange(event.target.value)} />;
-  if (["select","status"].includes(property.type)) return <select value={String(value??"")} onChange={event=>onChange(event.target.value)}><option value="" />{propertyOptions(property).map(option=><option key={option.name}>{option.name}</option>)}</select>;
-  if (property.type === "relation") return <input value={Array.isArray(value)?value.join(", "):""} placeholder="Related row IDs" onChange={event=>onChange(event.target.value.split(",").map(item=>item.trim()).filter(Boolean))}/>;
-  return <input value={Array.isArray(value)?value.join(", "):String(value??"")} placeholder={property.type} onChange={event=>onChange(property.type==="multi_select"?event.target.value.split(",").map(item=>item.trim()).filter(Boolean):event.target.value)} />;
+function Cell({
+  property,
+  value,
+  onChange,
+}: {
+  property: DatabaseProperty;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}) {
+  if (["formula", "rollup"].includes(property.type))
+    return <span className="computed-cell">{String(value ?? "—")}</span>;
+  if (property.type === "checkbox")
+    return (
+      <input
+        type="checkbox"
+        checked={Boolean(value)}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    );
+  if (property.type === "number")
+    return (
+      <input
+        type="number"
+        value={String(value ?? "")}
+        onChange={(event) =>
+          onChange(event.target.value ? Number(event.target.value) : null)
+        }
+      />
+    );
+  if (property.type === "date")
+    return (
+      <input
+        type="date"
+        value={String(value ?? "").slice(0, 10)}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  if (["select", "status"].includes(property.type))
+    return (
+      <select
+        value={String(value ?? "")}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="" />
+        {propertyOptions(property).map((option) => (
+          <option key={option.name}>{option.name}</option>
+        ))}
+      </select>
+    );
+  if (property.type === "relation")
+    return (
+      <input
+        value={Array.isArray(value) ? value.join(", ") : ""}
+        placeholder="Related row IDs"
+        onChange={(event) =>
+          onChange(
+            event.target.value
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean),
+          )
+        }
+      />
+    );
+  return (
+    <input
+      value={Array.isArray(value) ? value.join(", ") : String(value ?? "")}
+      placeholder={property.type}
+      onChange={(event) =>
+        onChange(
+          property.type === "multi_select"
+            ? event.target.value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean)
+            : event.target.value,
+        )
+      }
+    />
+  );
 }
 
-export function DatabasePanel({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
-  const [items,setItems]=useState<Array<Pick<Database,"id"|"name"|"description">>>([]); const [database,setDatabase]=useState<Database>(); const [viewId,setViewId]=useState(""); const [controls,setControls]=useState(false);
-  const loadList=()=>api<{databases:any[]}>(`/workspaces/${workspaceId}/databases`).then(result=>setItems(result.databases));
-  const load=(id:string)=>api<{database:Database}>(`/databases/${id}`).then(result=>{setDatabase(result.database);setViewId(result.database.views[0]?.id??"")});
-  useEffect(()=>{void loadList()},[workspaceId]);
-  const create=async()=>{const result=await api<{database:Database}>("/databases",{method:"POST",body:JSON.stringify({workspaceId,name:"New database"})});setItems(current=>[result.database,...current]);setDatabase(result.database);setViewId(result.database.views[0]?.id??"")};
-  const view=database?.views.find(item=>item.id===viewId)??database?.views[0];
-  const rows=useMemo(()=>{if(!database)return[];let result=database.rows.filter(row=>((view?.config.filters??[])as ViewFilter[]).every(filter=>matches(row.values[filter.propertyId],filter)));for(const sort of (view?.config.sorts??[])as ViewSort[])result=[...result].sort((a,b)=>compare(a.values[sort.propertyId],b.values[sort.propertyId])*(sort.direction==="desc"?-1:1));return result},[database,view]);
-  const updateView=async(config:DatabaseView["config"])=>{if(!database||!view)return;const result=await api<{view:DatabaseView}>(`/database-views/${view.id}`,{method:"PATCH",body:JSON.stringify({config})});setDatabase({...database,views:database.views.map(item=>item.id===view.id?result.view:item)})};
-  const addRow=async(values:Record<string,unknown>={})=>{if(!database)return;const title=database.properties.find(property=>property.type==="title");const result=await api<{row:DatabaseRow}>(`/databases/${database.id}/rows`,{method:"POST",body:JSON.stringify({values:{...(title?{[title.id]:"Untitled"}:{}),...values}})});setDatabase({...database,rows:[...database.rows,result.row]})};
-  const updateRow=async(row:DatabaseRow,propertyId:string,value:unknown)=>{if(!database)return;const optimistic={...row,values:{...row.values,[propertyId]:value}};setDatabase({...database,rows:database.rows.map(item=>item.id===row.id?optimistic:item)});const result=await api<{row:DatabaseRow}>(`/database-rows/${row.id}`,{method:"PATCH",body:JSON.stringify({values:{[propertyId]:value}})});setDatabase(current=>current?{...current,rows:current.rows.map(item=>item.id===row.id?result.row:item)}:current)};
-  const deleteRow=async(id:string)=>{if(!database||!confirm("Delete this row?"))return;await api(`/database-rows/${id}`,{method:"DELETE"});setDatabase({...database,rows:database.rows.filter(row=>row.id!==id)})};
-  const addProperty=async()=>{if(!database)return;const name=prompt("Property name");if(!name)return;const type=(prompt(`Type: ${propertyTypes.join(", ")}`,"text")??"text")as PropertyType;if(!propertyTypes.includes(type))return;let config:Record<string,unknown>={};if(type==="formula"){const numeric=database.properties.find(item=>item.type==="number");const expression=prompt("Arithmetic formula. Reference properties with {property-id}.",numeric?`{${numeric.id}} * 1`:"0");if(expression===null)return;config={expression}}if(type==="relation")config={targetDatabaseId:database.id};if(type==="rollup"){const relation=database.properties.find(item=>item.type==="relation");if(!relation){alert("Add a relation property first.");return}const target=database.properties.find(item=>item.type==="number")??database.properties[0]!;const aggregation=prompt("Aggregation: count, sum, average, min, max, show","count")??"count";config={relationPropertyId:relation.id,targetPropertyId:target.id,aggregation}}const result=await api<{property:DatabaseProperty}>(`/databases/${database.id}/properties`,{method:"POST",body:JSON.stringify({name,type,config})});setDatabase({...database,properties:[...database.properties,result.property]})};
-  const addView=async()=>{if(!database)return;const type=(prompt("View: table, board, calendar, list, gallery","board")??"board")as DatabaseView["type"];if(!viewIcons[type])return;const result=await api<{view:DatabaseView}>(`/databases/${database.id}/views`,{method:"POST",body:JSON.stringify({name:type[0]!.toUpperCase()+type.slice(1),type})});setDatabase({...database,views:[...database.views,result.view]});setViewId(result.view.id)};
-  return <aside className="database-panel"><header><h2>Databases</h2><button onClick={onClose}><X size={18}/></button></header><div className="database-layout"><nav><button className="primary-button compact" onClick={()=>void create()}><Plus size={15}/>New database</button>{items.map(item=><button className={database?.id===item.id?"active":""} key={item.id} onClick={()=>void load(item.id)}><Table2 size={15}/>{item.name}</button>)}</nav><section>{!database?<div className="empty-state"><Table2/><p>Create a database for projects, tasks, or structured knowledge.</p></div>:<><div className="database-title"><input value={database.name} readOnly/><div><button onClick={()=>setControls(value=>!value)}><Settings2 size={14}/>View options</button><button onClick={addProperty}><Plus size={14}/>Property</button></div></div><div className="view-tabs">{database.views.map(item=>{const Icon=viewIcons[item.type];return <button className={view?.id===item.id?"active":""} key={item.id} onClick={()=>setViewId(item.id)}><Icon size={14}/>{item.name}</button>})}<button onClick={addView}><Plus size={14}/>View</button></div>{controls&&view&&<ViewControls database={database} view={view} updateView={updateView}/>}<DatabaseBody database={database} view={view} rows={rows} updateRow={updateRow} deleteRow={deleteRow}/><button className="add-row" onClick={()=>void addRow()}><Plus size={14}/>New</button></>}</section></div></aside>;
+export function DatabasePanel({
+  workspaceId,
+  onClose,
+  onOpenPage,
+}: {
+  workspaceId: string;
+  onClose: () => void;
+  onOpenPage: (pageId: string) => void;
+}) {
+  const [items, setItems] = useState<
+    Array<Pick<Database, "id" | "name" | "description">>
+  >([]);
+  const [database, setDatabase] = useState<Database>();
+  const [viewId, setViewId] = useState("");
+  const [controls, setControls] = useState(false);
+  const loadList = () =>
+    api<{ databases: any[] }>(`/workspaces/${workspaceId}/databases`).then(
+      (result) => setItems(result.databases),
+    );
+  const load = (id: string) =>
+    api<{ database: Database }>(`/databases/${id}`).then((result) => {
+      setDatabase(result.database);
+      setViewId(result.database.views[0]?.id ?? "");
+    });
+  useEffect(() => {
+    void loadList();
+  }, [workspaceId]);
+  const create = async () => {
+    const result = await api<{ database: Database }>("/databases", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId, name: "New database" }),
+    });
+    setItems((current) => [result.database, ...current]);
+    setDatabase(result.database);
+    setViewId(result.database.views[0]?.id ?? "");
+  };
+  const view =
+    database?.views.find((item) => item.id === viewId) ?? database?.views[0];
+  const rows = useMemo(() => {
+    if (!database) return [];
+    let result = database.rows.filter((row) =>
+      ((view?.config.filters ?? []) as ViewFilter[]).every((filter) =>
+        matches(row.values[filter.propertyId], filter),
+      ),
+    );
+    for (const sort of (view?.config.sorts ?? []) as ViewSort[])
+      result = [...result].sort(
+        (a, b) =>
+          compare(a.values[sort.propertyId], b.values[sort.propertyId]) *
+          (sort.direction === "desc" ? -1 : 1),
+      );
+    return result;
+  }, [database, view]);
+  const updateView = async (config: DatabaseView["config"]) => {
+    if (!database || !view) return;
+    const result = await api<{ view: DatabaseView }>(
+      `/database-views/${view.id}`,
+      { method: "PATCH", body: JSON.stringify({ config }) },
+    );
+    setDatabase({
+      ...database,
+      views: database.views.map((item) =>
+        item.id === view.id ? result.view : item,
+      ),
+    });
+  };
+  const addRow = async (values: Record<string, unknown> = {}) => {
+    if (!database) return;
+    const title = database.properties.find(
+      (property) => property.type === "title",
+    );
+    const result = await api<{ row: DatabaseRow }>(
+      `/databases/${database.id}/rows`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          values: { ...(title ? { [title.id]: "Untitled" } : {}), ...values },
+        }),
+      },
+    );
+    setDatabase({ ...database, rows: [...database.rows, result.row] });
+  };
+  const updateRow = async (
+    row: DatabaseRow,
+    propertyId: string,
+    value: unknown,
+  ) => {
+    if (!database) return;
+    const optimistic = {
+      ...row,
+      values: { ...row.values, [propertyId]: value },
+    };
+    setDatabase({
+      ...database,
+      rows: database.rows.map((item) =>
+        item.id === row.id ? optimistic : item,
+      ),
+    });
+    const result = await api<{ row: DatabaseRow }>(`/database-rows/${row.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ values: { [propertyId]: value } }),
+    });
+    setDatabase((current) =>
+      current
+        ? {
+            ...current,
+            rows: current.rows.map((item) =>
+              item.id === row.id ? result.row : item,
+            ),
+          }
+        : current,
+    );
+  };
+  const deleteRow = async (id: string) => {
+    if (!database || !confirm("Delete this row?")) return;
+    await api(`/database-rows/${id}`, { method: "DELETE" });
+    setDatabase({
+      ...database,
+      rows: database.rows.filter((row) => row.id !== id),
+    });
+  };
+  const openRow = async (row: DatabaseRow) => {
+    const result = row.pageId
+      ? { pageId: row.pageId }
+      : await api<{ pageId: string }>(`/database-rows/${row.id}/page`, { method: "POST" });
+    onOpenPage(result.pageId);
+  };
+  const addProperty = async () => {
+    if (!database) return;
+    const name = prompt("Property name");
+    if (!name) return;
+    const type = (prompt(`Type: ${propertyTypes.join(", ")}`, "text") ??
+      "text") as PropertyType;
+    if (!propertyTypes.includes(type)) return;
+    let config: Record<string, unknown> = {};
+    if (type === "formula") {
+      const numeric = database.properties.find(
+        (item) => item.type === "number",
+      );
+      const expression = prompt(
+        "Arithmetic formula. Reference properties with {property-id}.",
+        numeric ? `{${numeric.id}} * 1` : "0",
+      );
+      if (expression === null) return;
+      config = { expression };
+    }
+    if (type === "relation") config = { targetDatabaseId: database.id };
+    if (type === "rollup") {
+      const relation = database.properties.find(
+        (item) => item.type === "relation",
+      );
+      if (!relation) {
+        alert("Add a relation property first.");
+        return;
+      }
+      const target =
+        database.properties.find((item) => item.type === "number") ??
+        database.properties[0]!;
+      const aggregation =
+        prompt("Aggregation: count, sum, average, min, max, show", "count") ??
+        "count";
+      config = {
+        relationPropertyId: relation.id,
+        targetPropertyId: target.id,
+        aggregation,
+      };
+    }
+    const result = await api<{ property: DatabaseProperty }>(
+      `/databases/${database.id}/properties`,
+      { method: "POST", body: JSON.stringify({ name, type, config }) },
+    );
+    setDatabase({
+      ...database,
+      properties: [...database.properties, result.property],
+    });
+  };
+  const addView = async () => {
+    if (!database) return;
+    const type = (prompt(
+      "View: table, board, calendar, list, gallery",
+      "board",
+    ) ?? "board") as DatabaseView["type"];
+    if (!viewIcons[type]) return;
+    const result = await api<{ view: DatabaseView }>(
+      `/databases/${database.id}/views`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: type[0]!.toUpperCase() + type.slice(1),
+          type,
+        }),
+      },
+    );
+    setDatabase({ ...database, views: [...database.views, result.view] });
+    setViewId(result.view.id);
+  };
+  return (
+    <aside className="database-panel">
+      <header>
+        <h2>Databases</h2>
+        <button onClick={onClose}>
+          <X size={18} />
+        </button>
+      </header>
+      <div className="database-layout">
+        <nav>
+          <button
+            className="primary-button compact"
+            onClick={() => void create()}
+          >
+            <Plus size={15} />
+            New database
+          </button>
+          {items.map((item) => (
+            <button
+              className={database?.id === item.id ? "active" : ""}
+              key={item.id}
+              onClick={() => void load(item.id)}
+            >
+              <Table2 size={15} />
+              {item.name}
+            </button>
+          ))}
+        </nav>
+        <section>
+          {!database ? (
+            <div className="empty-state">
+              <Table2 />
+              <p>
+                Create a database for projects, tasks, or structured knowledge.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="database-title">
+                <input value={database.name} readOnly />
+                <div>
+                  <button onClick={() => setControls((value) => !value)}>
+                    <Settings2 size={14} />
+                    View options
+                  </button>
+                  <button onClick={addProperty}>
+                    <Plus size={14} />
+                    Property
+                  </button>
+                </div>
+              </div>
+              <div className="view-tabs">
+                {database.views.map((item) => {
+                  const Icon = viewIcons[item.type];
+                  return (
+                    <button
+                      className={view?.id === item.id ? "active" : ""}
+                      key={item.id}
+                      onClick={() => setViewId(item.id)}
+                    >
+                      <Icon size={14} />
+                      {item.name}
+                    </button>
+                  );
+                })}
+                <button onClick={addView}>
+                  <Plus size={14} />
+                  View
+                </button>
+              </div>
+              {controls && view && (
+                <ViewControls
+                  database={database}
+                  view={view}
+                  updateView={updateView}
+                />
+              )}
+              <DatabaseBody
+                database={database}
+                view={view}
+                rows={rows}
+                updateRow={updateRow}
+                deleteRow={deleteRow}
+                openRow={openRow}
+              />
+              <button className="add-row" onClick={() => void addRow()}>
+                <Plus size={14} />
+                New
+              </button>
+            </>
+          )}
+        </section>
+      </div>
+    </aside>
+  );
 }
 
-function ViewControls({database,view,updateView}:{database:Database;view:DatabaseView;updateView:(config:DatabaseView["config"])=>Promise<void>}){const config=view.config;const addFilter=()=>{const property=database.properties[0];if(property)void updateView({...config,filters:[...(config.filters??[]),{propertyId:property.id,operator:"contains",value:""}]})};const addSort=()=>{const property=database.properties[0];if(property)void updateView({...config,sorts:[...(config.sorts??[]),{propertyId:property.id,direction:"asc"}]})};return <div className="view-controls"><div><strong><Filter size={14}/>Filters</strong>{(config.filters??[]).map((filter:any,index)=><div className="control-row" key={index}><select value={filter.propertyId} onChange={event=>void updateView({...config,filters:(config.filters??[]).map((item:any,i)=>i===index?{...item,propertyId:event.target.value}:item)})}>{database.properties.map(property=><option key={property.id} value={property.id}>{property.name}</option>)}</select><select value={filter.operator} onChange={event=>void updateView({...config,filters:(config.filters??[]).map((item:any,i)=>i===index?{...item,operator:event.target.value}:item)})}>{["contains","equals","not_equals","empty","not_empty","greater","less","before","after"].map(operator=><option key={operator}>{operator}</option>)}</select>{!["empty","not_empty"].includes(filter.operator)&&<input value={String(filter.value??"")} onChange={event=>void updateView({...config,filters:(config.filters??[]).map((item:any,i)=>i===index?{...item,value:event.target.value}:item)})}/>}<button onClick={()=>void updateView({...config,filters:(config.filters??[]).filter((_,i)=>i!==index)})}><X size={13}/></button></div>)}<button onClick={addFilter}><Plus size={13}/>Filter</button></div><div><strong>↕ Sorts</strong>{(config.sorts??[]).map((sort:any,index)=><div className="control-row" key={index}><select value={sort.propertyId} onChange={event=>void updateView({...config,sorts:(config.sorts??[]).map((item:any,i)=>i===index?{...item,propertyId:event.target.value}:item)})}>{database.properties.map(property=><option key={property.id} value={property.id}>{property.name}</option>)}</select><select value={sort.direction} onChange={event=>void updateView({...config,sorts:(config.sorts??[]).map((item:any,i)=>i===index?{...item,direction:event.target.value}:item)})}><option value="asc">Ascending</option><option value="desc">Descending</option></select><button onClick={()=>void updateView({...config,sorts:(config.sorts??[]).filter((_,i)=>i!==index)})}><X size={13}/></button></div>)}<button onClick={addSort}><Plus size={13}/>Sort</button></div><label>Group by <select value={String(config.groupBy??"")} onChange={event=>void updateView({...config,groupBy:event.target.value||undefined})}><option value="">No grouping</option>{database.properties.filter(property=>["select","status","checkbox","person"].includes(property.type)).map(property=><option key={property.id} value={property.id}>{property.name}</option>)}</select></label>{view.type==="calendar"&&<label>Date property <select value={String(config.dateProperty??"")} onChange={event=>void updateView({...config,dateProperty:event.target.value})}>{database.properties.filter(property=>property.type==="date").map(property=><option key={property.id} value={property.id}>{property.name}</option>)}</select></label>}</div>}
+function ViewControls({
+  database,
+  view,
+  updateView,
+}: {
+  database: Database;
+  view: DatabaseView;
+  updateView: (config: DatabaseView["config"]) => Promise<void>;
+}) {
+  const config = view.config;
+  const addFilter = () => {
+    const property = database.properties[0];
+    if (property)
+      void updateView({
+        ...config,
+        filters: [
+          ...(config.filters ?? []),
+          { propertyId: property.id, operator: "contains", value: "" },
+        ],
+      });
+  };
+  const addSort = () => {
+    const property = database.properties[0];
+    if (property)
+      void updateView({
+        ...config,
+        sorts: [
+          ...(config.sorts ?? []),
+          { propertyId: property.id, direction: "asc" },
+        ],
+      });
+  };
+  return (
+    <div className="view-controls">
+      <div>
+        <strong>
+          <Filter size={14} />
+          Filters
+        </strong>
+        {(config.filters ?? []).map((filter: any, index) => (
+          <div className="control-row" key={index}>
+            <select
+              value={filter.propertyId}
+              onChange={(event) =>
+                void updateView({
+                  ...config,
+                  filters: (config.filters ?? []).map((item: any, i) =>
+                    i === index
+                      ? { ...item, propertyId: event.target.value }
+                      : item,
+                  ),
+                })
+              }
+            >
+              {database.properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filter.operator}
+              onChange={(event) =>
+                void updateView({
+                  ...config,
+                  filters: (config.filters ?? []).map((item: any, i) =>
+                    i === index
+                      ? { ...item, operator: event.target.value }
+                      : item,
+                  ),
+                })
+              }
+            >
+              {[
+                "contains",
+                "equals",
+                "not_equals",
+                "empty",
+                "not_empty",
+                "greater",
+                "less",
+                "before",
+                "after",
+              ].map((operator) => (
+                <option key={operator}>{operator}</option>
+              ))}
+            </select>
+            {!["empty", "not_empty"].includes(filter.operator) && (
+              <input
+                value={String(filter.value ?? "")}
+                onChange={(event) =>
+                  void updateView({
+                    ...config,
+                    filters: (config.filters ?? []).map((item: any, i) =>
+                      i === index
+                        ? { ...item, value: event.target.value }
+                        : item,
+                    ),
+                  })
+                }
+              />
+            )}
+            <button
+              onClick={() =>
+                void updateView({
+                  ...config,
+                  filters: (config.filters ?? []).filter((_, i) => i !== index),
+                })
+              }
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
+        <button onClick={addFilter}>
+          <Plus size={13} />
+          Filter
+        </button>
+      </div>
+      <div>
+        <strong>↕ Sorts</strong>
+        {(config.sorts ?? []).map((sort: any, index) => (
+          <div className="control-row" key={index}>
+            <select
+              value={sort.propertyId}
+              onChange={(event) =>
+                void updateView({
+                  ...config,
+                  sorts: (config.sorts ?? []).map((item: any, i) =>
+                    i === index
+                      ? { ...item, propertyId: event.target.value }
+                      : item,
+                  ),
+                })
+              }
+            >
+              {database.properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sort.direction}
+              onChange={(event) =>
+                void updateView({
+                  ...config,
+                  sorts: (config.sorts ?? []).map((item: any, i) =>
+                    i === index
+                      ? { ...item, direction: event.target.value }
+                      : item,
+                  ),
+                })
+              }
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+            <button
+              onClick={() =>
+                void updateView({
+                  ...config,
+                  sorts: (config.sorts ?? []).filter((_, i) => i !== index),
+                })
+              }
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
+        <button onClick={addSort}>
+          <Plus size={13} />
+          Sort
+        </button>
+      </div>
+      <label>
+        Group by{" "}
+        <select
+          value={String(config.groupBy ?? "")}
+          onChange={(event) =>
+            void updateView({
+              ...config,
+              groupBy: event.target.value || undefined,
+            })
+          }
+        >
+          <option value="">No grouping</option>
+          {database.properties
+            .filter((property) =>
+              ["select", "status", "checkbox", "person"].includes(
+                property.type,
+              ),
+            )
+            .map((property) => (
+              <option key={property.id} value={property.id}>
+                {property.name}
+              </option>
+            ))}
+        </select>
+      </label>
+      {view.type === "calendar" && (
+        <label>
+          Date property{" "}
+          <select
+            value={String(config.dateProperty ?? "")}
+            onChange={(event) =>
+              void updateView({ ...config, dateProperty: event.target.value })
+            }
+          >
+            {database.properties
+              .filter((property) => property.type === "date")
+              .map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
 
-function DatabaseBody(props:{database:Database;view?:DatabaseView;rows:DatabaseRow[];updateRow:(row:DatabaseRow,property:string,value:unknown)=>void;deleteRow:(id:string)=>void}){const{database,view,rows,updateRow,deleteRow}=props;const title=database.properties.find(property=>property.type==="title")?.id??database.properties[0]!.id;if(view?.type==="board")return <BoardView database={database} view={view} rows={rows} title={title} updateRow={updateRow}/>;if(view?.type==="calendar")return <CalendarView database={database} view={view} rows={rows} title={title} updateRow={updateRow}/>;if(view?.type==="gallery")return <div className="gallery-view">{rows.map(row=><div className="database-card" key={row.id}><div className="card-cover"/><strong>{String(row.values[title]??"Untitled")}</strong>{database.properties.slice(1,4).map(property=><small key={property.id}>{property.name}: {String(row.values[property.id]??"—")}</small>)}</div>)}</div>;if(view?.type==="list")return <div className="list-view">{rows.map(row=><div key={row.id}><span>▤ {String(row.values[title]??"Untitled")}</span><button onClick={()=>deleteRow(row.id)}><Trash2 size={13}/></button></div>)}</div>;const groups=view?.config.groupBy?[...new Set(rows.map(row=>String(row.values[String(view.config.groupBy)]??"No group")))]:[""];return <>{groups.map(group=><section className="table-group" key={group}>{group&&<h4>{group} <span>{rows.filter(row=>String(row.values[String(view?.config.groupBy)]??"No group")===group).length}</span></h4>}<div className="database-table"><table><thead><tr>{database.properties.map(property=><th key={property.id}>{property.name}</th>)}<th className="row-action"/></tr></thead><tbody>{rows.filter(row=>!group||String(row.values[String(view?.config.groupBy)]??"No group")===group).map(row=><tr key={row.id}>{database.properties.map(property=><td key={property.id}><Cell property={property} value={row.values[property.id]} onChange={value=>updateRow(row,property.id,value)}/></td>)}<td className="row-action"><button onClick={()=>deleteRow(row.id)}><Trash2 size={13}/></button></td></tr>)}</tbody><tfoot><tr>{database.properties.map(property=><td key={property.id}>{property.type==="number"?`Σ ${rows.reduce((sum,row)=>sum+(Number(row.values[property.id])||0),0)}`:property.type==="title"?`${rows.length} rows`:""}</td>)}<td/></tr></tfoot></table></div></section>)}</>}
+function DatabaseBody(props: {
+  database: Database;
+  view?: DatabaseView;
+  rows: DatabaseRow[];
+  updateRow: (row: DatabaseRow, property: string, value: unknown) => void;
+  deleteRow: (id: string) => void;
+  openRow: (row: DatabaseRow) => void;
+}) {
+  const { database, view, rows, updateRow, deleteRow, openRow } = props;
+  const title =
+    database.properties.find((property) => property.type === "title")?.id ??
+    database.properties[0]!.id;
+  if (view?.type === "board")
+    return (
+      <BoardView
+        database={database}
+        view={view}
+        rows={rows}
+        title={title}
+        updateRow={updateRow}
+      />
+    );
+  if (view?.type === "calendar")
+    return (
+      <CalendarView
+        database={database}
+        view={view}
+        rows={rows}
+        title={title}
+        updateRow={updateRow}
+      />
+    );
+  if (view?.type === "gallery")
+    return (
+      <div className="gallery-view">
+        {rows.map((row) => (
+          <div className="database-card" key={row.id}>
+            <div className="card-cover" />
+            <strong>{String(row.values[title] ?? "Untitled")}</strong>
+            {database.properties.slice(1, 4).map((property) => (
+              <small key={property.id}>
+                {property.name}: {String(row.values[property.id] ?? "—")}
+              </small>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  if (view?.type === "list")
+    return (
+      <div className="list-view">
+        {rows.map((row) => (
+          <div key={row.id}>
+            <span>▤ {String(row.values[title] ?? "Untitled")}</span>
+            <button onClick={() => deleteRow(row.id)}>
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  const groups = view?.config.groupBy
+    ? [
+        ...new Set(
+          rows.map((row) =>
+            String(row.values[String(view.config.groupBy)] ?? "No group"),
+          ),
+        ),
+      ]
+    : [""];
+  return (
+    <>
+      {groups.map((group) => (
+        <section className="table-group" key={group}>
+          {group && (
+            <h4>
+              {group}{" "}
+              <span>
+                {
+                  rows.filter(
+                    (row) =>
+                      String(
+                        row.values[String(view?.config.groupBy)] ?? "No group",
+                      ) === group,
+                  ).length
+                }
+              </span>
+            </h4>
+          )}
+          <div className="database-table">
+            <table>
+              <thead>
+                <tr>
+                  {database.properties.map((property) => (
+                    <th key={property.id}>{property.name}</th>
+                  ))}
+                  <th className="row-action" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows
+                  .filter(
+                    (row) =>
+                      !group ||
+                      String(
+                        row.values[String(view?.config.groupBy)] ?? "No group",
+                      ) === group,
+                  )
+                  .map((row) => (
+                    <tr key={row.id}>
+                      {database.properties.map((property) => (
+                        <td key={property.id}>
+                          <Cell
+                            property={property}
+                            value={row.values[property.id]}
+                            onChange={(value) =>
+                              updateRow(row, property.id, value)
+                            }
+                          />
+                        </td>
+                      ))}
+                      <td className="row-action">
+                        <button title="Open row as page" onClick={() => openRow(row)}>
+                          <FileText size={13} />
+                        </button>
+                        <button onClick={() => deleteRow(row.id)}>
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  {database.properties.map((property) => (
+                    <td key={property.id}>
+                      {property.type === "number"
+                        ? `Σ ${rows.reduce((sum, row) => sum + (Number(row.values[property.id]) || 0), 0)}`
+                        : property.type === "title"
+                          ? `${rows.length} rows`
+                          : ""}
+                    </td>
+                  ))}
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
 
-function BoardView({database,view,rows,title,updateRow}:{database:Database;view:DatabaseView;rows:DatabaseRow[];title:string;updateRow:(row:DatabaseRow,property:string,value:unknown)=>void}){const groupId=String(view.config.groupBy??database.properties.find(property=>property.type==="status")?.id??"");const property=database.properties.find(item=>item.id===groupId);const groups=propertyOptions(property).map(option=>option.name);if(rows.some(row=>!groups.includes(String(row.values[groupId]??"Not started"))))groups.push(...new Set(rows.map(row=>String(row.values[groupId]??"Not started")).filter(value=>!groups.includes(value))));return <div className="board-view">{groups.map(group=><div className="board-column" key={group} onDragOver={event=>event.preventDefault()} onDrop={event=>{const row=rows.find(item=>item.id===event.dataTransfer.getData("text/row-id"));if(row)updateRow(row,groupId,group)}}><h4>{group}<span>{rows.filter(row=>String(row.values[groupId]??"Not started")===group).length}</span></h4>{rows.filter(row=>String(row.values[groupId]??"Not started")===group).map(row=><div draggable onDragStart={event=>event.dataTransfer.setData("text/row-id",row.id)} className="database-card" key={row.id}><strong>{String(row.values[title]??"Untitled")}</strong></div>)}</div>)}</div>}
+function BoardView({
+  database,
+  view,
+  rows,
+  title,
+  updateRow,
+}: {
+  database: Database;
+  view: DatabaseView;
+  rows: DatabaseRow[];
+  title: string;
+  updateRow: (row: DatabaseRow, property: string, value: unknown) => void;
+}) {
+  const groupId = String(
+    view.config.groupBy ??
+      database.properties.find((property) => property.type === "status")?.id ??
+      "",
+  );
+  const property = database.properties.find((item) => item.id === groupId);
+  const groups = propertyOptions(property).map((option) => option.name);
+  if (
+    rows.some(
+      (row) => !groups.includes(String(row.values[groupId] ?? "Not started")),
+    )
+  )
+    groups.push(
+      ...new Set(
+        rows
+          .map((row) => String(row.values[groupId] ?? "Not started"))
+          .filter((value) => !groups.includes(value)),
+      ),
+    );
+  return (
+    <div className="board-view">
+      {groups.map((group) => (
+        <div
+          className="board-column"
+          key={group}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            const row = rows.find(
+              (item) => item.id === event.dataTransfer.getData("text/row-id"),
+            );
+            if (row) updateRow(row, groupId, group);
+          }}
+        >
+          <h4>
+            {group}
+            <span>
+              {
+                rows.filter(
+                  (row) =>
+                    String(row.values[groupId] ?? "Not started") === group,
+                ).length
+              }
+            </span>
+          </h4>
+          {rows
+            .filter(
+              (row) => String(row.values[groupId] ?? "Not started") === group,
+            )
+            .map((row) => (
+              <div
+                draggable
+                onDragStart={(event) =>
+                  event.dataTransfer.setData("text/row-id", row.id)
+                }
+                className="database-card"
+                key={row.id}
+              >
+                <strong>{String(row.values[title] ?? "Untitled")}</strong>
+              </div>
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-function CalendarView({database,view,rows,title,updateRow}:{database:Database;view:DatabaseView;rows:DatabaseRow[];title:string;updateRow:(row:DatabaseRow,property:string,value:unknown)=>void}){const[month,setMonth]=useState(()=>{const date=new Date();return new Date(date.getFullYear(),date.getMonth(),1)});const dateId=String(view.config.dateProperty??database.properties.find(property=>property.type==="date")?.id??"");const start=new Date(month);start.setDate(1-start.getDay());const days=Array.from({length:42},(_,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);return date});const key=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;return <div className="calendar-shell"><header><button onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}><ChevronLeft size={16}/></button><strong>{month.toLocaleString(undefined,{month:"long",year:"numeric"})}</strong><button onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}><ChevronRight size={16}/></button></header><div className="calendar-weekdays">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(day=><span key={day}>{day}</span>)}</div><div className="calendar-month">{days.map(date=><div className={date.getMonth()===month.getMonth()?"":"outside"} key={key(date)} onDragOver={event=>event.preventDefault()} onDrop={event=>{const row=rows.find(item=>item.id===event.dataTransfer.getData("text/row-id"));if(row&&dateId)updateRow(row,dateId,key(date))}}><time>{date.getDate()}</time>{rows.filter(row=>String(row.values[dateId]??"").slice(0,10)===key(date)).map(row=><div draggable onDragStart={event=>event.dataTransfer.setData("text/row-id",row.id)} className="calendar-event" key={row.id}>{String(row.values[title]??"Untitled")}</div>)}</div>)}</div></div>}
+function CalendarView({
+  database,
+  view,
+  rows,
+  title,
+  updateRow,
+}: {
+  database: Database;
+  view: DatabaseView;
+  rows: DatabaseRow[];
+  title: string;
+  updateRow: (row: DatabaseRow, property: string, value: unknown) => void;
+}) {
+  const [month, setMonth] = useState(() => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  });
+  const dateId = String(
+    view.config.dateProperty ??
+      database.properties.find((property) => property.type === "date")?.id ??
+      "",
+  );
+  const start = new Date(month);
+  start.setDate(1 - start.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+  const key = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return (
+    <div className="calendar-shell">
+      <header>
+        <button
+          onClick={() =>
+            setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
+          }
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <strong>
+          {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
+        </strong>
+        <button
+          onClick={() =>
+            setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
+          }
+        >
+          <ChevronRight size={16} />
+        </button>
+      </header>
+      <div className="calendar-weekdays">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="calendar-month">
+        {days.map((date) => (
+          <div
+            className={date.getMonth() === month.getMonth() ? "" : "outside"}
+            key={key(date)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              const row = rows.find(
+                (item) => item.id === event.dataTransfer.getData("text/row-id"),
+              );
+              if (row && dateId) updateRow(row, dateId, key(date));
+            }}
+          >
+            <time>{date.getDate()}</time>
+            {rows
+              .filter(
+                (row) =>
+                  String(row.values[dateId] ?? "").slice(0, 10) === key(date),
+              )
+              .map((row) => (
+                <div
+                  draggable
+                  onDragStart={(event) =>
+                    event.dataTransfer.setData("text/row-id", row.id)
+                  }
+                  className="calendar-event"
+                  key={row.id}
+                >
+                  {String(row.values[title] ?? "Untitled")}
+                </div>
+              ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

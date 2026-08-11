@@ -47,7 +47,7 @@ export default function WorkspaceApp() {
     </section>
     {activePage && panel === "comments" && <CommentsPanel page={activePage} onClose={() => setPanel(null)} />}
     {activePage && panel === "access" && workspaces.find((item) => item.id === workspaceId) && <AccessPanel workspace={workspaces.find((item) => item.id === workspaceId)!} page={activePage} onClose={() => setPanel(null)} />}
-    {databasesOpen && <DatabasePanel workspaceId={workspaceId} onClose={() => setDatabasesOpen(false)} />}
+    {databasesOpen && <DatabasePanel workspaceId={workspaceId} onClose={() => setDatabasesOpen(false)} onOpenPage={(id) => { setDatabasesOpen(false); void loadPages(workspaceId).then(() => setPageId(id)); }} />}
     {toolsOpen && <ToolsPanel workspaceId={workspaceId} pageId={pageId} onImported={(id)=>{setToolsOpen(false);void loadPages(workspaceId).then(()=>setPageId(id))}} onClose={()=>setToolsOpen(false)}/>}
     {searchOpen && <div className="modal-backdrop" onClick={() => setSearchOpen(false)}><section className="search-modal" onClick={(event) => event.stopPropagation()}><div className="search-input"><Search size={19} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pages…" /></div><div className="search-results">{results.map((page) => <button key={page.id} onClick={() => { setPageId(page.id); setSearchOpen(false); }}><span>{page.icon ?? "📄"}</span><span>{page.title}</span></button>)}{query && !results.length && <p>No pages found</p>}</div></section></div>}
     {error && <button className="toast" onClick={() => setError("")}>{error}</button>}
