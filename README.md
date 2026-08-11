@@ -30,7 +30,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Persistent compound filters, multi-column sorting, grouping and numeric totals.
 - Drag-and-drop status boards and a navigable month calendar with drag-to-reschedule.
 - Public database forms with typed fields, required-field validation, configurable labels, share links and response storage.
-- Basic property-change automations with set-property and notification actions.
+- Visual database automations with property-change and recurring schedule triggers, set-property, notification and archive actions, manual runs, enable/disable controls and execution logs.
 
 ### Collaboration and identity
 
@@ -59,6 +59,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Database view controls cover filters, sorts and grouping, but do not yet support nested AND/OR filter groups or every property-specific operator.
 - Calendar supports month navigation and drag-to-reschedule, but week/day layouts and recurring events are not implemented.
 - Form creation and public submission are available; drag-and-drop field ordering, conditional fields and response analytics are unfinished.
+- Scheduled automations run in the API process; multi-instance deployments require a dedicated distributed job runner to prevent duplicate executions.
 - Live presence shows viewers, but not remote cursors, selections or block-level activity.
 - WebSocket reconnection and large-room scaling are not production-hardened.
 - Comments do not have text-range anchoring, mentions, reactions or attachments.
@@ -99,7 +100,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Configurable card previews and visible properties.
 - Database templates, linked database views and buttons.
 - Drag-and-drop form design, conditional fields, response analytics and export.
-- Visual automation builder, schedules, recurring triggers, conditions, logs and retries.
+- Compound automation conditions, retry policies, delayed actions and a distributed job runner.
 - Recurring tasks, dependencies, milestones and project reporting.
 
 ### Collaboration, security and administration
@@ -147,6 +148,7 @@ Completed implementation phases:
 11. Functional same-database relations, safe arithmetic formulas and rollup aggregations.
 12. Page-backed database rows with collaborative document bodies.
 13. Public database forms with typed response collection.
+14. Visual property-change and recurring automations with execution history.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 

@@ -23,6 +23,7 @@ import type {
   PropertyType,
 } from "@notionlike/contracts";
 import { api } from "../../lib/api";
+import { AutomationPanel } from "./automation-panel";
 
 const propertyTypes: PropertyType[] = [
   "text",
@@ -215,6 +216,7 @@ export function DatabasePanel({
   const [database, setDatabase] = useState<Database>();
   const [viewId, setViewId] = useState("");
   const [controls, setControls] = useState(false);
+  const [automationsOpen, setAutomationsOpen] = useState(false);
   const loadList = () =>
     api<{ databases: any[] }>(`/workspaces/${workspaceId}/databases`).then(
       (result) => setItems(result.databases),
@@ -412,6 +414,7 @@ export function DatabasePanel({
     alert("Public form link copied to clipboard.");
   };
   return (
+    <>
     <aside className="database-panel">
       <header>
         <h2>Databases</h2>
@@ -464,6 +467,10 @@ export function DatabasePanel({
                       <FileText size={14} />
                       Create form
                     </button>
+                    <button onClick={() => setAutomationsOpen(true)}>
+                      <Settings2 size={14} />
+                      Automations
+                    </button>
                 </div>
               </div>
               <div className="view-tabs">
@@ -509,6 +516,8 @@ export function DatabasePanel({
         </section>
       </div>
     </aside>
+    {automationsOpen && database && <AutomationPanel database={database} onClose={() => setAutomationsOpen(false)} />}
+    </>
   );
 }
 
