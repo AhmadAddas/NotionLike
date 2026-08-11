@@ -29,7 +29,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Saved view configuration, sorting metadata and grouping metadata.
 - Persistent compound filters, multi-column sorting, grouping and numeric totals.
 - Drag-and-drop status boards and a navigable month calendar with drag-to-reschedule.
-- Public form and response APIs.
+- Public database forms with typed fields, required-field validation, configurable labels, share links and response storage.
 - Basic property-change automations with set-property and notification actions.
 
 ### Collaboration and identity
@@ -58,7 +58,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Formulas currently support safe arithmetic and property references, not the complete Notion-style formula language for strings, dates and collections.
 - Database view controls cover filters, sorts and grouping, but do not yet support nested AND/OR filter groups or every property-specific operator.
 - Calendar supports month navigation and drag-to-reschedule, but week/day layouts and recurring events are not implemented.
-- Forms and automations have backend APIs but no complete visual builders.
+- Form creation and public submission are available; drag-and-drop field ordering, conditional fields and response analytics are unfinished.
 - Live presence shows viewers, but not remote cursors, selections or block-level activity.
 - WebSocket reconnection and large-room scaling are not production-hardened.
 - Comments do not have text-range anchoring, mentions, reactions or attachments.
@@ -98,7 +98,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Week/day calendar layouts and recurring calendar events.
 - Configurable card previews and visible properties.
 - Database templates, linked database views and buttons.
-- Complete form builder, validation, response management and public form UI.
+- Drag-and-drop form design, conditional fields, response analytics and export.
 - Visual automation builder, schedules, recurring triggers, conditions, logs and retries.
 - Recurring tasks, dependencies, milestones and project reporting.
 
@@ -146,6 +146,7 @@ Completed implementation phases:
 10. Advanced database filters, sorting, grouping, totals, board drag-and-drop and month calendar.
 11. Functional same-database relations, safe arithmetic formulas and rollup aggregations.
 12. Page-backed database rows with collaborative document bodies.
+13. Public database forms with typed response collection.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated on a host with available Docker storage; the development host had a full `/var` partition during the last migration run.
 

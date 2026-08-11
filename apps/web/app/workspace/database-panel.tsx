@@ -396,6 +396,21 @@ export function DatabasePanel({
     setDatabase({ ...database, views: [...database.views, result.view] });
     setViewId(result.view.id);
   };
+  const createForm = async () => {
+    if (!database) return;
+    const title = prompt("Form title", `${database.name} form`);
+    if (!title) return;
+    const required = database.properties
+      .filter((property) => property.type === "title")
+      .map((property) => property.id);
+    const result = await api<{ form: { token: string } }>(`/databases/${database.id}/forms`, {
+      method: "POST",
+      body: JSON.stringify({ title, description: database.description, config: { required, submitLabel: "Submit" } }),
+    });
+    const url = `${location.origin}/form/${result.form.token}`;
+    await navigator.clipboard.writeText(url);
+    alert("Public form link copied to clipboard.");
+  };
   return (
     <aside className="database-panel">
       <header>
@@ -441,10 +456,14 @@ export function DatabasePanel({
                     <Settings2 size={14} />
                     View options
                   </button>
-                  <button onClick={addProperty}>
-                    <Plus size={14} />
-                    Property
-                  </button>
+                    <button onClick={addProperty}>
+                      <Plus size={14} />
+                      Property
+                    </button>
+                    <button onClick={() => void createForm()}>
+                      <FileText size={14} />
+                      Create form
+                    </button>
                 </div>
               </div>
               <div className="view-tabs">
