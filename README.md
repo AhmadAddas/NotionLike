@@ -12,6 +12,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Collaborative Tiptap/Yjs block editor.
 - Paragraphs, headings, bold, italic, underline, highlight, links, ordered and unordered lists, task lists, quotes, syntax-highlighted code blocks and images.
 - Searchable, grouped slash-command palette with aliases, keyboard navigation and commands for text, headings, lists, tasks, quotes, code, dividers, tables, callouts, toggles, images, PDFs and files.
+- Contextual block controls for inserting, drag reordering, moving, duplicating, deleting and converting individual blocks.
 - Editable simple tables, collapsible toggle blocks, callouts and horizontal dividers.
 - Offline editor persistence in IndexedDB and durable server-side Yjs updates.
 - Live document updates and basic collaborator presence.
@@ -74,6 +75,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - The plugin system validates and stores manifests, but it does not yet execute UI extensions or provide a complete sandboxed SDK.
 - OIDC is supported, but SAML, SCIM, domain claiming and enterprise authentication policies are not.
 - File upload size is currently limited to 25 MB.
+- Block controls currently operate on one top-level block at a time; nested-block dragging and multi-block actions are unfinished.
 - Android is an early Expo client; native sharing, widgets, capture, push notifications and background sync are unfinished.
 - There are no iOS or desktop clients and no browser web clipper.
 - Automated coverage is limited; collaboration, permissions, migrations and offline conflict cases need broader integration and end-to-end tests.
@@ -83,8 +85,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 
 ### Editor parity
 
-- Block insertion controls and drag handles.
-- Multi-block selection, duplication, movement and block transformation.
+- Multi-block selection, duplication, movement and transformation.
 - Toggle headings and multi-column layouts.
 - Table of contents, breadcrumbs, equations, buttons and reusable templates.
 - Synced blocks, backlinks, page mentions, user mentions and reminders.
@@ -150,6 +151,7 @@ Completed implementation phases:
 13. Public database forms with typed response collection.
 14. Visual property-change and recurring automations with execution history.
 15. Searchable, cursor-positioned slash-command palette with keyboard controls and expanded block commands.
+16. Contextual insertion and drag controls with block movement, duplication, deletion and type conversion.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated.
 

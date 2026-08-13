@@ -35,6 +35,13 @@ const toBase64 = (value: Uint8Array) => {
 };
 const lowlight = createLowlight(common);
 type SlashCommand = { id: string; label: string; description: string; icon: string; group: "Basic" | "Lists" | "Media" | "Advanced"; aliases: string[]; run: () => void };
+type ActiveBlock = { pos: number; index: number; type: string; top: number; left: number };
+
+const blockAtSelection = (editor: { state: { selection: { $from: { depth: number; before: (depth: number) => number; index: (depth: number) => number; node: (depth: number) => { type: { name: string } } } } } }) => {
+  const { $from } = editor.state.selection;
+  if ($from.depth < 1) return null;
+  return { pos: $from.before(1), index: $from.index(0), type: $from.node(1).type.name };
+};
 
 export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initialUpdate, onSyncState, user, onPresence }: BlockEditorProps) {
   const document = useMemo(() => new Y.Doc(), [pageId]);
@@ -46,10 +53,13 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   const [slashQuery, setSlashQuery] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashPosition, setSlashPosition] = useState({ left: 0, top: 0 });
+  const [activeBlock, setActiveBlock] = useState<ActiveBlock | null>(null);
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const slashRange = useRef<{ from: number; to: number } | null>(null);
   const slashCommandsRef = useRef<SlashCommand[]>([]);
   const slashIndexRef = useRef(0);
   const slashMenu = useRef<HTMLDivElement>(null);
+  const draggedBlock = useRef<{ pos: number; size: number } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : undefined, [token]);
 
@@ -144,6 +154,12 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
     ],
     editable: !readOnly,
     immediatelyRender: false,
+    onSelectionUpdate: ({ editor: current }) => {
+      const block = blockAtSelection(current);
+      if (!block) return setActiveBlock(null);
+      const coordinates = current.view.coordsAtPos(block.pos + 1);
+      setActiveBlock({ ...block, top: coordinates.top, left: coordinates.left });
+    },
     onUpdate: ({ editor: current }) => {
       const { from } = current.state.selection;
       const start = Math.max(0, from - 80);
@@ -165,6 +181,25 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       if ((event.key === "Enter" || event.key === "Tab") && commands.length) { event.preventDefault(); commands[slashIndexRef.current]?.run(); return true; }
       if (event.key === "Escape") { event.preventDefault(); slashRange.current=null;setSlashOpen(false);return true; }
       return false;
+    }, handleDrop: (view, event) => {
+      const source = draggedBlock.current;
+      const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+      if (!source || !coordinates) return false;
+      const $target = view.state.doc.resolve(coordinates.pos);
+      if ($target.depth < 1) return false;
+      const targetPos = $target.before(1);
+      const targetNode = $target.node(1);
+      const targetBox = view.coordsAtPos(targetPos + 1);
+      const insertPos = event.clientY > (targetBox.top + targetBox.bottom) / 2 ? targetPos + targetNode.nodeSize : targetPos;
+      if (insertPos >= source.pos && insertPos <= source.pos + source.size) return true;
+      event.preventDefault();
+      const node = view.state.doc.nodeAt(source.pos);
+      if (!node) return false;
+      const transaction = view.state.tr.delete(source.pos, source.pos + source.size);
+      transaction.insert(transaction.mapping.map(insertPos), node);
+      view.dispatch(transaction.scrollIntoView());
+      draggedBlock.current = null;
+      return true;
     } },
   }, [document, readOnly]);
 
@@ -194,6 +229,18 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   if (!ready || !editor) return <div className="editor-loading">Loading page…</div>;
   const removeSlash = () => { const range=slashRange.current;if(range)editor.chain().focus().deleteRange(range).run();slashRange.current=null;setSlashOpen(false);setSlashQuery(""); };
   const command = (action: () => void) => { removeSlash(); action(); };
+  const selectBlock = () => { if (activeBlock) editor.commands.setTextSelection(activeBlock.pos + 1); };
+  const mutateBlock = (action: "duplicate" | "delete" | "up" | "down") => {
+    if (!activeBlock) return;
+    const node=editor.state.doc.nodeAt(activeBlock.pos);if(!node)return;
+    const transaction=editor.state.tr;const previous=activeBlock.index>0?editor.state.doc.child(activeBlock.index-1):null;const next=activeBlock.index<editor.state.doc.childCount-1?editor.state.doc.child(activeBlock.index+1):null;
+    if(action==="duplicate")transaction.insert(activeBlock.pos+node.nodeSize,node.copy(node.content));
+    if(action==="delete")transaction.delete(activeBlock.pos,activeBlock.pos+node.nodeSize);
+    if(action==="up"&&previous){const previousPos=activeBlock.pos-previous.nodeSize;transaction.delete(activeBlock.pos,activeBlock.pos+node.nodeSize).insert(previousPos,node);}
+    if(action==="down"&&next){transaction.delete(activeBlock.pos,activeBlock.pos+node.nodeSize).insert(transaction.mapping.map(activeBlock.pos+node.nodeSize+next.nodeSize),node);}
+    editor.view.dispatch(transaction.scrollIntoView());setBlockMenuOpen(false);editor.commands.focus();
+  };
+  const convertBlock = (type:"paragraph"|"heading"|"blockquote"|"codeBlock",level?:1|2|3) => {selectBlock();if(type==="heading")editor.chain().focus().setHeading({level:level!}).run();else if(type==="paragraph")editor.chain().focus().setParagraph().run();else editor.chain().focus().setNode(type).run();setBlockMenuOpen(false);};
   const setLink = () => { const href = prompt("Link URL", editor.getAttributes("link").href ?? "https://"); if (href === null) return; if (!href) editor.chain().focus().unsetLink().run(); else editor.chain().focus().extendMarkRange("link").setLink({ href }).run(); };
   const tableContent={ type:"table",content:Array.from({length:3},(_,row)=>({type:"tableRow",content:Array.from({length:3},()=>({type:row===0?"tableHeader":"tableCell",content:[{type:"paragraph"}]}))})) };
   const commands:SlashCommand[]=[
@@ -215,6 +262,17 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   const normalized=slashQuery.toLowerCase();const filtered=commands.filter(item=>!normalized||[item.label,item.id,...item.aliases].some(value=>value.toLowerCase().includes(normalized)));
   const activeIndex=Math.min(slashIndex,Math.max(filtered.length-1,0));slashCommandsRef.current=filtered;slashIndexRef.current=activeIndex;
   return <div className="block-editor">
+    {!readOnly && activeBlock && <div className="block-controls" style={{top:activeBlock.top,left:activeBlock.left}} onMouseDown={event=>event.preventDefault()}>
+      <button className="block-add" title="Insert block above" aria-label="Insert block above" onClick={()=>editor.chain().focus().insertContentAt(activeBlock.pos,{type:"paragraph"}).setTextSelection(activeBlock.pos+1).run()}>+</button>
+      <button className="block-grip" title="Drag to move or click for options" aria-label="Block options" draggable
+        onDragStart={event=>{const node=editor.state.doc.nodeAt(activeBlock.pos);if(!node)return;draggedBlock.current={pos:activeBlock.pos,size:node.nodeSize};event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain","");}}
+        onDragEnd={()=>{draggedBlock.current=null}} onClick={()=>setBlockMenuOpen(open=>!open)}>⋮⋮</button>
+      {blockMenuOpen && <div className="block-menu" role="menu">
+        <strong>Turn into</strong>
+        <button onClick={()=>convertBlock("paragraph")}>Text</button><button onClick={()=>convertBlock("heading",1)}>Heading 1</button><button onClick={()=>convertBlock("heading",2)}>Heading 2</button><button onClick={()=>convertBlock("heading",3)}>Heading 3</button><button onClick={()=>convertBlock("blockquote")}>Quote</button><button onClick={()=>convertBlock("codeBlock")}>Code</button>
+        <hr/><button disabled={activeBlock.index===0} onClick={()=>mutateBlock("up")}>↑ Move up</button><button disabled={activeBlock.index===editor.state.doc.childCount-1} onClick={()=>mutateBlock("down")}>↓ Move down</button><button onClick={()=>mutateBlock("duplicate")}>Duplicate</button><button className="danger" onClick={()=>mutateBlock("delete")}>Delete</button>
+      </div>}
+    </div>}
     {!readOnly && <div className="editor-toolbar" role="toolbar" aria-label="Text formatting">
       <button onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive("bold")}><strong>B</strong></button>
       <button onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive("italic")}><em>I</em></button>
