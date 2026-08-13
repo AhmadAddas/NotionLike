@@ -13,7 +13,7 @@ import Underline from "@tiptap/extension-underline";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import * as Y from "yjs";
-import { Callout, FileAttachment, HighlightMark, TableCell, TableHeader, TableNode, TableRow, ToggleBlock } from "./extensions";
+import { BookmarkBlock, Callout, EmbedBlock, FileAttachment, HighlightMark, MediaBlock, TableCell, TableHeader, TableNode, TableRow, ToggleBlock } from "./extensions";
 
 export type SyncState = "loading" | "offline" | "saving" | "saved" | "error";
 export type BlockEditorProps = {
@@ -150,7 +150,7 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       Link.configure({ openOnClick: false, autolink: true }), Image.configure({ allowBase64: false }),
       Placeholder.configure({ placeholder: "Type '/' for commands…" }), TaskList, TaskItem.configure({ nested: true }),
       Underline, HighlightMark, TableNode, TableRow, TableHeader, TableCell,
-      CodeBlockLowlight.configure({ lowlight }), Callout, ToggleBlock, FileAttachment,
+      CodeBlockLowlight.configure({ lowlight }), Callout, ToggleBlock, FileAttachment, MediaBlock, BookmarkBlock, EmbedBlock,
     ],
     editable: !readOnly,
     immediatelyRender: false,
@@ -220,6 +220,8 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       const upload = await fetch(target.uploadUrl, { method: "PUT", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
       if (!upload.ok) throw new Error("Upload failed");
       if (file.type.startsWith("image/")) editor.chain().focus().setImage({ src: target.publicUrl, alt: file.name, title: file.name }).run();
+      else if (file.type.startsWith("audio/")) editor.chain().focus().insertContent({ type: "mediaBlock", attrs: { src: target.publicUrl, kind: "audio", title: file.name } }).run();
+      else if (file.type.startsWith("video/")) editor.chain().focus().insertContent({ type: "mediaBlock", attrs: { src: target.publicUrl, kind: "video", title: file.name } }).run();
       else editor.chain().focus().insertContent({ type: "fileAttachment", attrs: { src: target.publicUrl, name: file.name, mime: file.type, size: file.size } }).run();
       onSyncState?.("saving");
     } catch { onSyncState?.("error"); }
@@ -242,6 +244,7 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
   };
   const convertBlock = (type:"paragraph"|"heading"|"blockquote"|"codeBlock",level?:1|2|3) => {selectBlock();if(type==="heading")editor.chain().focus().setHeading({level:level!}).run();else if(type==="paragraph")editor.chain().focus().setParagraph().run();else editor.chain().focus().setNode(type).run();setBlockMenuOpen(false);};
   const setLink = () => { const href = prompt("Link URL", editor.getAttributes("link").href ?? "https://"); if (href === null) return; if (!href) editor.chain().focus().unsetLink().run(); else editor.chain().focus().extendMarkRange("link").setLink({ href }).run(); };
+  const askForUrl = (label:string) => {const value=prompt(label,"https://");if(!value)return null;try{const url=new URL(value);return url.protocol==="http:"||url.protocol==="https:"?url.toString():null;}catch{return null;}};
   const tableContent={ type:"table",content:Array.from({length:3},(_,row)=>({type:"tableRow",content:Array.from({length:3},()=>({type:row===0?"tableHeader":"tableCell",content:[{type:"paragraph"}]}))})) };
   const commands:SlashCommand[]=[
     {id:"text",label:"Text",description:"Plain paragraph",icon:"¶",group:"Basic",aliases:["paragraph","plain"],run:()=>command(()=>editor.chain().focus().setParagraph().run())},
@@ -258,6 +261,10 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
     {id:"image",label:"Image",description:"Upload and display an image",icon:"▧",group:"Media",aliases:["photo","picture","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
     {id:"pdf",label:"PDF",description:"Upload and preview a PDF",icon:"PDF",group:"Media",aliases:["document","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
     {id:"file",label:"File",description:"Upload a downloadable attachment",icon:"📎",group:"Media",aliases:["attachment","upload"],run:()=>{removeSlash();fileInput.current?.click()}},
+    {id:"audio",label:"Audio",description:"Upload an audio player",icon:"♪",group:"Media",aliases:["sound","music"],run:()=>{removeSlash();fileInput.current?.click()}},
+    {id:"video",label:"Video",description:"Upload a video player",icon:"▶",group:"Media",aliases:["movie"],run:()=>{removeSlash();fileInput.current?.click()}},
+    {id:"bookmark",label:"Web bookmark",description:"Add a linked website card",icon:"↗",group:"Media",aliases:["book","url","website"],run:()=>{removeSlash();const href=askForUrl("Bookmark URL");if(href)editor.chain().focus().insertContent({type:"bookmarkBlock",attrs:{href,title:new URL(href).hostname}}).run()}},
+    {id:"embed",label:"Embed",description:"Embed content from a URL",icon:"<>",group:"Media",aliases:["iframe"],run:()=>{removeSlash();const src=askForUrl("Embed URL");if(src)editor.chain().focus().insertContent({type:"embedBlock",attrs:{src,title:new URL(src).hostname}}).run()}},
   ];
   const normalized=slashQuery.toLowerCase();const filtered=commands.filter(item=>!normalized||[item.label,item.id,...item.aliases].some(value=>value.toLowerCase().includes(normalized)));
   const activeIndex=Math.min(slashIndex,Math.max(filtered.length-1,0));slashCommandsRef.current=filtered;slashIndexRef.current=activeIndex;
@@ -286,7 +293,7 @@ export function BlockEditor({ pageId, apiBaseUrl, token, readOnly = false, initi
       <button onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive("blockquote")}>Quote</button>
       <button onClick={() => editor.chain().focus().setHorizontalRule().run()}>Divider</button>
       <button disabled={uploading} onClick={() => fileInput.current?.click()}>{uploading ? "Uploading…" : "File / PDF"}</button>
-      <input ref={fileInput} hidden type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
+      <input ref={fileInput} hidden type="file" accept="image/*,audio/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
     </div>}
     {slashOpen && !readOnly && <div ref={slashMenu} className="slash-menu" role="menu" aria-label="Insert block" style={slashPosition}>
       <div className="slash-menu-query"><span>/</span>{slashQuery || "Type to filter"}</div>

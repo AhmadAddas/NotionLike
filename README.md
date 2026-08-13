@@ -17,6 +17,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Offline editor persistence in IndexedDB and durable server-side Yjs updates.
 - Live document updates and basic collaborator presence.
 - File uploads to self-hosted S3/MinIO, including inline images, inline PDF previews and downloadable document attachments.
+- Audio and video upload players, linked website bookmark cards and sandboxed URL embed blocks.
 - Page search, public read-only links, named versions and version restoration APIs.
 - Markdown, HTML and text note import; Markdown, HTML and JSON page export.
 
@@ -76,6 +77,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - OIDC is supported, but SAML, SCIM, domain claiming and enterprise authentication policies are not.
 - File upload size is currently limited to 25 MB.
 - Block controls currently operate on one top-level block at a time; nested-block dragging and multi-block actions are unfinished.
+- URL embeds depend on the target service allowing iframe display; provider-specific embeds, link metadata previews and media resizing are unfinished.
 - Android is an early Expo client; native sharing, widgets, capture, push notifications and background sync are unfinished.
 - There are no iOS or desktop clients and no browser web clipper.
 - Automated coverage is limited; collaboration, permissions, migrations and offline conflict cases need broader integration and end-to-end tests.
@@ -89,7 +91,7 @@ A self-hosted workspace for nested pages, block editing, offline-safe synchroniz
 - Toggle headings and multi-column layouts.
 - Table of contents, breadcrumbs, equations, buttons and reusable templates.
 - Synced blocks, backlinks, page mentions, user mentions and reminders.
-- Audio/video viewers, captions, resizing, bookmarks and rich embeds.
+- Media captions, resizing, provider-specific embeds and automatic bookmark metadata previews.
 - Code-language selection, more colors and typography controls.
 
 ### Database and project parity
@@ -152,6 +154,7 @@ Completed implementation phases:
 14. Visual property-change and recurring automations with execution history.
 15. Searchable, cursor-positioned slash-command palette with keyboard controls and expanded block commands.
 16. Contextual insertion and drag controls with block movement, duplication, deletion and type conversion.
+17. Audio/video playback, website bookmarks and sandboxed URL embeds.
 
 The production TypeScript/API/web image builds pass. A clean live migration test for the latest migrations still needs to be repeated.
 
